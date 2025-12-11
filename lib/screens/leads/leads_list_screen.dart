@@ -135,7 +135,24 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
         body: _showingGrid
             ? _buildDashboard(authProvider, leadProvider)
             : _buildLeadsList(leadProvider),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: _handleCreateLead,
+          backgroundColor: AppColors.primary,
+          icon: const Icon(Icons.add),
+          label: const Text('Add Lead'),
+        ),
       ),
+    );
+  }
+
+  void _handleCreateLead() {
+    Navigator.of(context).pushNamed('/create-lead');
+  }
+
+  void _handleLeadTap(Lead lead) {
+    Navigator.of(context).pushNamed(
+      '/lead-detail',
+      arguments: lead.id,
     );
   }
 

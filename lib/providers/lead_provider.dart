@@ -206,6 +206,28 @@ class LeadProvider with ChangeNotifier {
     }
   }
 
+  // Create new lead
+  Future<bool> createLead(Map<String, dynamic> leadData) async {
+    _error = null;
+
+    final response = await _apiService.post<Lead>(
+      AppConfig.leadsEndpoint,
+      body: leadData,
+      fromJson: (data) => Lead.fromJson(data as Map<String, dynamic>),
+    );
+
+    if (response.success && response.data != null) {
+      // Add the new lead to the top of the list
+      _leads.insert(0, response.data!);
+      notifyListeners();
+      return true;
+    } else {
+      _error = response.error ?? 'Failed to create lead';
+      notifyListeners();
+      return false;
+    }
+  }
+
   // Add comment to lead
   Future<bool> addComment(String leadId, String comment) async {
     _error = null;
