@@ -26,6 +26,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
       final provider = Provider.of<LeadProvider>(context, listen: false);
       provider.fetchLeadById(widget.leadId);
       provider.fetchCustomFields();
+      provider.fetchFieldGroups();
     });
   }
 
@@ -384,20 +385,37 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
   }
 
   Widget _buildCustomFields(Lead lead, List<CustomField> customFields) {
+    final leadProvider = Provider.of<LeadProvider>(context, listen: false);
+    final fieldGroups = leadProvider.fieldGroups;
+
     // Group fields
     final groupedFields = <String, List<CustomField>>{};
     for (var field in customFields) {
       if (field.group.isEmpty) {
-        groupedFields.putIfAbsent('Additional Info', () => []).add(field);
+        groupedFields.putIfAbsent('General Info', () => []).add(field);
       } else {
         groupedFields.putIfAbsent(field.group, () => []).add(field);
       }
     }
 
+    // Sort groups based on master list
+    final sortedGroupNames = groupedFields.keys.toList()
+      ..sort((a, b) {
+        final indexA = fieldGroups.indexWhere((fg) => fg.name == a);
+        final indexB = fieldGroups.indexWhere((fg) => fg.name == b);
+
+        if (indexA != -1 && indexB != -1) {
+          return fieldGroups[indexA].order.compareTo(fieldGroups[indexB].order);
+        }
+        if (indexA != -1) return -1;
+        if (indexB != -1) return 1;
+        return a.compareTo(b);
+      });
+
     return Column(
-      children: groupedFields.entries.map((entry) {
-        final groupName = entry.key;
-        final fields = entry.value..sort((a, b) => a.order.compareTo(b.order));
+      children: sortedGroupNames.map((groupName) {
+        final fields = groupedFields[groupName]!
+          ..sort((a, b) => a.order.compareTo(b.order));
         
         // Check if group has any data to display
         bool hasData = fields.any((f) => lead.customData[f.key] != null && lead.customData[f.key].toString().isNotEmpty);

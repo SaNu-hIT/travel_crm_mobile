@@ -237,7 +237,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
                       
                       // Title
                       const Text(
@@ -249,7 +249,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                           height: 1.2,
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       
                       // Search Bar
                       GestureDetector(
@@ -281,7 +281,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                                 prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
                                 border: InputBorder.none,
                                 contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
+                                  horizontal: 8,
                                   vertical: 14,
                                 ),
                               ),
@@ -343,7 +343,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                 
                 const SizedBox(height: 24),
                 
-                const SizedBox(height: 24),
+       
                 
                 // Lead Status Section
                 Row(
@@ -363,7 +363,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+         
                 
                 // Status Grid
                 GridView.builder(

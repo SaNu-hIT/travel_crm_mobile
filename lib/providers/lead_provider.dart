@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
 import '../models/lead.dart';
 import '../models/custom_field.dart';
+import '../models/field_group.dart';
 import '../models/api_response.dart';
 import '../services/api_service.dart';
 import '../utils/constants.dart';
@@ -269,6 +270,24 @@ class LeadProvider with ChangeNotifier {
 
     if (response.success && response.data != null) {
       _customFields = response.data!;
+      notifyListeners();
+    }
+  }
+
+  // Field Groups
+  List<FieldGroup> _fieldGroups = [];
+  List<FieldGroup> get fieldGroups => _fieldGroups;
+
+  Future<void> fetchFieldGroups() async {
+    final response = await _apiService.get<List<FieldGroup>>(
+      '/settings/field-groups',
+      fromJson: (data) => (data as List).map((e) => FieldGroup.fromJson(e)).toList(),
+    );
+
+    if (response.success && response.data != null) {
+      _fieldGroups = response.data!;
+      // Sort by order
+      _fieldGroups.sort((a, b) => a.order.compareTo(b.order));
       notifyListeners();
     }
   }

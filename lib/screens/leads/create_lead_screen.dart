@@ -39,14 +39,10 @@ class _CreateLeadScreenState extends State<CreateLeadScreen> {
     _nameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
-    _locationController.dispose();
     _sourceController.dispose();
-    _tripTypeController.dispose();
-    _startDateController.dispose();
-    _daysController.dispose();
-    _adultsController.dispose();
-    _childrenController.dispose();
-    _budgetController.dispose();
+    for (var controller in _customControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
