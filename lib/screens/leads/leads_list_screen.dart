@@ -326,6 +326,8 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                 
                 const SizedBox(height: 24),
                 
+                const SizedBox(height: 24),
+                
                 // Lead Status Section
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -344,7 +346,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 
                 // Status Grid
                 GridView.builder(
@@ -352,8 +354,8 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                   physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 12, // Standardized to 12
+                    mainAxisSpacing: 12,  // Standardized to 12
                     childAspectRatio: 1.6,
                   ),
                   itemCount: 4, // Show only top 4 statuses
@@ -390,72 +392,64 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 
                 // Recent Leads List
-                ...leadProvider.leads.take(5).map((lead) => Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
+                if (leadProvider.leads.isEmpty)
+                  if (leadProvider.loadingState == LeadLoadingState.loading)
+                     const Center(child: Padding(
+                       padding: EdgeInsets.all(20.0),
+                       child: CircularProgressIndicator(),
+                     ))
+                  else
+                    Container(
+                      padding: const EdgeInsets.all(30),
+                      alignment: Alignment.center,
+                      child: Column(
+                        children: [
+                          Icon(Icons.inbox_outlined, size: 48, color: AppColors.textSecondary.withOpacity(0.5)),
+                          const SizedBox(height: 12),
+                          Text(
+                            'No recent leads',
+                            style: TextStyle(color: AppColors.textSecondary.withOpacity(0.8)),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.all(12),
-                    leading: CircleAvatar(
-                      backgroundColor: lead.status.color.withOpacity(0.2),
-                      child: Text(
-                        lead.name.substring(0, 1).toUpperCase(),
-                        style: TextStyle(
-                          color: lead.status.color,
-                          fontWeight: FontWeight.bold,
+                    )
+                else
+                  ...leadProvider.leads.take(5).map((lead) => GestureDetector(
+                    onTap: () => _handleLeadTap(lead),
+                    child: Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.all(12),
+                      leading: CircleAvatar(
+                        backgroundColor: lead.status.color.withOpacity(0.2),
+                        child: Text(
+                          lead.name.substring(0, 1).toUpperCase(),
+                          style: TextStyle(
+                            color: lead.status.color,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                    ),
-                    title: Text(
-                      lead.name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    subtitle: Text(
-                      lead.phone,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    trailing: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: lead.status.color.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        lead.status.displayName,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: lead.status.color,
+                      title: Text(
+                        lead.name,
+                        style: const TextStyle(
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ),
-                    onTap: () {
-                      Navigator.of(context).pushNamed(
-                        '/lead-detail',
-                        arguments: lead.id,
-                      );
-                    },
-                  ),
                 )),
               ]),
             ),
