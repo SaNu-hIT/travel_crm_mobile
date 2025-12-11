@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' as material;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
+import '../../models/lead.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/lead_provider.dart';
 import '../../utils/constants.dart';
