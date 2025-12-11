@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../config/app_config.dart';
 import '../models/lead.dart';
+import '../models/custom_field.dart';
 import '../models/api_response.dart';
 import '../services/api_service.dart';
 import '../utils/constants.dart';
@@ -253,6 +254,22 @@ class LeadProvider with ChangeNotifier {
       _error = response.error ?? 'Failed to add comment';
       notifyListeners();
       return false;
+    }
+  }
+
+  // Custom Fields
+  List<CustomField> _customFields = [];
+  List<CustomField> get customFields => _customFields;
+
+  Future<void> fetchCustomFields() async {
+    final response = await _apiService.get<List<CustomField>>(
+      '/settings/custom-fields',
+      fromJson: (data) => (data as List).map((e) => CustomField.fromJson(e)).toList(),
+    );
+
+    if (response.success && response.data != null) {
+      _customFields = response.data!;
+      notifyListeners();
     }
   }
 

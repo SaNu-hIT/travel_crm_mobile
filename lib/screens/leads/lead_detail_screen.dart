@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/lead.dart';
+import '../../models/custom_field.dart';
 import '../../providers/lead_provider.dart';
 import '../../utils/constants.dart';
 import '../../utils/helpers.dart';
@@ -22,8 +23,9 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<LeadProvider>(context, listen: false)
-          .fetchLeadById(widget.leadId);
+      final provider = Provider.of<LeadProvider>(context, listen: false);
+      provider.fetchLeadById(widget.leadId);
+      provider.fetchCustomFields();
     });
   }
 
@@ -189,15 +191,12 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
                     _buildContactInfo(lead),
                     const SizedBox(height: 16),
 
-                    // Travel Details
-                    if (lead.preferredLocation != null ||
-                        lead.checkInDate != null ||
-                        lead.numberOfDays != null)
-                      _buildTravelDetails(lead),
+                    // Custom Fields (Grouped)
+                    if (leadProvider.customFields.isNotEmpty)
+                      _buildCustomFields(lead, leadProvider.customFields),
                     
-                    if (lead.preferredLocation != null ||
-                        lead.checkInDate != null ||
-                        lead.numberOfDays != null)
+                    if (leadProvider.customFields.isNotEmpty)
+                      const SizedBox(height: 16),
                       const SizedBox(height: 16),
 
                     // Call History
@@ -384,87 +383,96 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
     );
   }
 
-  Widget _buildTravelDetails(Lead lead) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
+  Widget _buildCustomFields(Lead lead, List<CustomField> customFields) {
+    // Group fields
+    final groupedFields = <String, List<CustomField>>{};
+    for (var field in customFields) {
+      if (field.group.isEmpty) {
+        groupedFields.putIfAbsent('Additional Info', () => []).add(field);
+      } else {
+        groupedFields.putIfAbsent(field.group, () => []).add(field);
+      }
+    }
+
+    return Column(
+      children: groupedFields.entries.map((entry) {
+        final groupName = entry.key;
+        final fields = entry.value..sort((a, b) => a.order.compareTo(b.order));
+        
+        // Check if group has any data to display
+        bool hasData = fields.any((f) => lead.customData[f.key] != null && lead.customData[f.key].toString().isNotEmpty);
+        if (!hasData) return const SizedBox.shrink();
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Travel Details',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                groupName,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              ...fields.map((field) {
+                final value = lead.customData[field.key];
+                if (value == null || value.toString().isEmpty) return const SizedBox.shrink();
+                
+                String displayValue = value.toString();
+                if (field.type == 'date') {
+                   try {
+                     // Try parsing date string
+                     displayValue = formatDate(DateTime.parse(value.toString()));
+                   } catch (e) {
+                     displayValue = value.toString();
+                   }
+                }
+                
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _buildInfoRow(
+                    icon: _getIconForFieldType(field.type),
+                    label: field.label,
+                    value: displayValue,
+                    iconColor: AppColors.primary,
+                  ),
+                );
+              }),
+            ],
           ),
-          const SizedBox(height: 16),
-          if (lead.preferredLocation != null)
-            _buildInfoRow(
-              icon: Icons.location_on_rounded,
-              label: 'Destination',
-              value: lead.preferredLocation!,
-              iconColor: Colors.red,
-            ),
-          if (lead.checkInDate != null) ...[
-            const SizedBox(height: 12),
-            _buildInfoRow(
-              icon: Icons.calendar_today_rounded,
-              label: 'Check-in',
-              value: formatDate(lead.checkInDate!),
-              iconColor: Colors.blue,
-            ),
-          ],
-          if (lead.checkOutDate != null) ...[
-            const SizedBox(height: 12),
-            _buildInfoRow(
-              icon: Icons.calendar_month_rounded,
-              label: 'Check-out',
-              value: formatDate(lead.checkOutDate!),
-              iconColor: Colors.blue,
-            ),
-          ],
-          if (lead.numberOfDays != null) ...[
-            const SizedBox(height: 12),
-            _buildInfoRow(
-              icon: Icons.event_rounded,
-              label: 'Duration',
-              value: '${lead.numberOfDays} days',
-              iconColor: Colors.green,
-            ),
-          ],
-          if (lead.numberOfRooms != null) ...[
-            const SizedBox(height: 12),
-            _buildInfoRow(
-              icon: Icons.hotel_rounded,
-              label: 'Rooms',
-              value: lead.numberOfRooms.toString(),
-              iconColor: Colors.purple,
-            ),
-          ],
-          if (lead.quotedPackageCost != null) ...[
-            const SizedBox(height: 12),
-            _buildInfoRow(
-              icon: Icons.attach_money_rounded,
-              label: 'Quoted Cost',
-              value: '₹${lead.quotedPackageCost!.toStringAsFixed(2)}',
-              iconColor: AppColors.success,
-            ),
-          ],
-        ],
-      ),
+        );
+      }).toList(),
     );
+  }
+
+  IconData _getIconForFieldType(String type) {
+    switch (type) {
+      case 'date':
+        return Icons.calendar_today_rounded;
+      case 'number':
+        return Icons.numbers_rounded;
+      case 'select':
+        return Icons.list_rounded;
+      case 'textarea':
+        return Icons.notes_rounded;
+      default:
+        return Icons.text_fields_rounded;
+    }
   }
 
   Widget _buildCallHistory(Lead lead) {

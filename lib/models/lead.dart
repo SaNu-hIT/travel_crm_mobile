@@ -39,21 +39,8 @@ class Lead {
   final String phone;
   final String? email;
 
-  // Travel Details
-  final DateTime? dateOfEnquiry;
-  final String? native;
-  final String? preferredLocation;
-  final int? numberOfDays;
-  final DateTime? checkInDate;
-  final DateTime? checkOutDate;
-  final int? numberOfRooms;
-  final String? sightseeingBy;
-  final String? pickupDropoff;
-  final String? food;
-  final String? propertyName;
-  final String? trainTicket;
-  final double? quotedPackageCost;
-  final String? specialRequirements;
+  // Travel Details removed - using customData
+  final Map<String, dynamic> customData;
 
   // Tracking
   final DateTime? followUpDate;
@@ -83,20 +70,7 @@ class Lead {
     this.profileImage,
     required this.phone,
     this.email,
-    this.dateOfEnquiry,
-    this.native,
-    this.preferredLocation,
-    this.numberOfDays,
-    this.checkInDate,
-    this.checkOutDate,
-    this.numberOfRooms,
-    this.sightseeingBy,
-    this.pickupDropoff,
-    this.food,
-    this.propertyName,
-    this.trainTicket,
-    this.quotedPackageCost,
-    this.specialRequirements,
+    this.customData = const {},
     this.followUpDate,
     this.comments = const [],
     this.callLogs = const [],
@@ -130,28 +104,9 @@ class Lead {
       profileImage: json['profileImage'] as String?,
       phone: json['phone'] as String,
       email: json['email'] as String?,
-      dateOfEnquiry: json['dateOfEnquiry'] != null
-          ? DateTime.parse(json['dateOfEnquiry'] as String)
-          : null,
-      native: json['native'] as String?,
-      preferredLocation: json['preferredLocation'] as String?,
-      numberOfDays: json['numberOfDays'] as int?,
-      checkInDate: json['checkInDate'] != null
-          ? DateTime.parse(json['checkInDate'] as String)
-          : null,
-      checkOutDate: json['checkOutDate'] != null
-          ? DateTime.parse(json['checkOutDate'] as String)
-          : null,
-      numberOfRooms: json['numberOfRooms'] as int?,
-      sightseeingBy: json['sightseeingBy'] as String?,
-      pickupDropoff: json['pickupDropoff'] as String?,
-      food: json['food'] as String?,
-      propertyName: json['propertyName'] as String?,
-      trainTicket: json['trainTicket'] as String?,
-      quotedPackageCost: json['quotedPackageCost'] != null
-          ? (json['quotedPackageCost'] as num).toDouble()
-          : null,
-      specialRequirements: json['specialRequirements'] as String?,
+      customData: json['customData'] != null
+          ? Map<String, dynamic>.from(json['customData'] as Map)
+          : {},
       followUpDate: json['followUpDate'] != null
           ? DateTime.parse(json['followUpDate'] as String)
           : null,
@@ -194,20 +149,7 @@ class Lead {
       'profileImage': profileImage,
       'phone': phone,
       'email': email,
-      'dateOfEnquiry': dateOfEnquiry?.toIso8601String(),
-      'native': native,
-      'preferredLocation': preferredLocation,
-      'numberOfDays': numberOfDays,
-      'checkInDate': checkInDate?.toIso8601String(),
-      'checkOutDate': checkOutDate?.toIso8601String(),
-      'numberOfRooms': numberOfRooms,
-      'sightseeingBy': sightseeingBy,
-      'pickupDropoff': pickupDropoff,
-      'food': food,
-      'propertyName': propertyName,
-      'trainTicket': trainTicket,
-      'quotedPackageCost': quotedPackageCost,
-      'specialRequirements': specialRequirements,
+      'customData': customData,
       'followUpDate': followUpDate?.toIso8601String(),
       'comments': comments.map((c) => c.toJson()).toList(),
       'callLogs': callLogs.map((c) => c.toJson()).toList(),
@@ -234,20 +176,7 @@ class Lead {
     String? profileImage,
     String? phone,
     String? email,
-    DateTime? dateOfEnquiry,
-    String? native,
-    String? preferredLocation,
-    int? numberOfDays,
-    DateTime? checkInDate,
-    DateTime? checkOutDate,
-    int? numberOfRooms,
-    String? sightseeingBy,
-    String? pickupDropoff,
-    String? food,
-    String? propertyName,
-    String? trainTicket,
-    double? quotedPackageCost,
-    String? specialRequirements,
+    Map<String, dynamic>? customData,
     DateTime? followUpDate,
     List<LeadComment>? comments,
     List<CallLog>? callLogs,
@@ -271,20 +200,7 @@ class Lead {
       profileImage: profileImage ?? this.profileImage,
       phone: phone ?? this.phone,
       email: email ?? this.email,
-      dateOfEnquiry: dateOfEnquiry ?? this.dateOfEnquiry,
-      native: native ?? this.native,
-      preferredLocation: preferredLocation ?? this.preferredLocation,
-      numberOfDays: numberOfDays ?? this.numberOfDays,
-      checkInDate: checkInDate ?? this.checkInDate,
-      checkOutDate: checkOutDate ?? this.checkOutDate,
-      numberOfRooms: numberOfRooms ?? this.numberOfRooms,
-      sightseeingBy: sightseeingBy ?? this.sightseeingBy,
-      pickupDropoff: pickupDropoff ?? this.pickupDropoff,
-      food: food ?? this.food,
-      propertyName: propertyName ?? this.propertyName,
-      trainTicket: trainTicket ?? this.trainTicket,
-      quotedPackageCost: quotedPackageCost ?? this.quotedPackageCost,
-      specialRequirements: specialRequirements ?? this.specialRequirements,
+      customData: customData ?? this.customData,
       followUpDate: followUpDate ?? this.followUpDate,
       comments: comments ?? this.comments,
       callLogs: callLogs ?? this.callLogs,

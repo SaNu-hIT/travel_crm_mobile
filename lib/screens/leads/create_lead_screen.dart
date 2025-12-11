@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/lead_provider.dart';
+import '../../models/custom_field.dart';
 import '../../utils/constants.dart';
+import '../../utils/helpers.dart'; // For date formatting helpers if needed
+import 'package:intl/intl.dart';
 
 class CreateLeadScreen extends StatefulWidget {
   const CreateLeadScreen({super.key});
@@ -15,16 +18,19 @@ class _CreateLeadScreenState extends State<CreateLeadScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
-  final _locationController = TextEditingController();
   final _sourceController = TextEditingController(text: 'Manual');
-  final _tripTypeController = TextEditingController();
   
-  // Optional travel details
-  final _startDateController = TextEditingController();
-  final _daysController = TextEditingController();
-  final _adultsController = TextEditingController();
-  final _childrenController = TextEditingController();
-  final _budgetController = TextEditingController();
+  // Custom Data State
+  final Map<String, dynamic> _customData = {};
+  final Map<String, TextEditingController> _customControllers = {};
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<LeadProvider>(context, listen: false).fetchCustomFields();
+    });
+  }
 
   bool _isSubmitting = false;
 
@@ -58,31 +64,9 @@ class _CreateLeadScreenState extends State<CreateLeadScreen> {
       'phone': _phoneController.text.trim(),
       'email': _emailController.text.trim(),
       'source': _sourceController.text.trim(),
-      'status': 'NEW', // Default status must match backend enum
+      'status': 'NEW',
+      'customData': _customData,
     };
-
-    // Add optional fields if they have values
-    if (_locationController.text.isNotEmpty) {
-      leadData['preferred_location'] = _locationController.text.trim();
-    }
-    if (_tripTypeController.text.isNotEmpty) {
-      leadData['trip_type'] = _tripTypeController.text.trim();
-    }
-    if (_daysController.text.isNotEmpty) {
-      leadData['number_of_days'] = int.tryParse(_daysController.text.trim());
-    }
-    if (_startDateController.text.isNotEmpty) {
-      leadData['check_in_date'] = _startDateController.text.trim();
-    }
-    if (_adultsController.text.isNotEmpty) {
-      leadData['adults_count'] = int.tryParse(_adultsController.text.trim());
-    }
-    if (_childrenController.text.isNotEmpty) {
-      leadData['children_count'] = int.tryParse(_childrenController.text.trim());
-    }
-    if (_budgetController.text.isNotEmpty) {
-      leadData['budget'] = double.tryParse(_budgetController.text.trim());
-    }
 
     final success = await leadProvider.createLead(leadData);
 
@@ -172,60 +156,48 @@ class _CreateLeadScreenState extends State<CreateLeadScreen> {
             
             const SizedBox(height: 24),
             
-            // Travel Requirements
-            _buildSectionHeader('Travel Requirements'),
-            _buildCard(
-              children: [
-                _buildTextField(
-                  controller: _locationController,
-                  label: 'Preferred Location',
-                  icon: Icons.location_on_outlined,
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildTextField(
-                        controller: _daysController,
-                        label: 'Days',
-                        icon: Icons.calendar_today_outlined,
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildTextField(
-                        controller: _budgetController,
-                        label: 'Budget',
-                        icon: Icons.attach_money,
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildTextField(
-                        controller: _adultsController,
-                        label: 'Adults',
-                        icon: Icons.people_outline,
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildTextField(
-                        controller: _childrenController,
-                        label: 'Children',
-                        icon: Icons.child_care_outlined,
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+            const SizedBox(height: 24),
+            
+            // Dynamic Custom Fields
+            Consumer<LeadProvider>(
+              builder: (context, leadProvider, child) {
+                if (leadProvider.customFields.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+                
+                // Group fields
+                final groupedFields = <String, List<CustomField>>{};
+                for (var field in leadProvider.customFields) {
+                  if (field.group.isEmpty) {
+                    groupedFields.putIfAbsent('Additional Info', () => []).add(field);
+                  } else {
+                    groupedFields.putIfAbsent(field.group, () => []).add(field);
+                  }
+                }
+
+                return Column(
+                  children: groupedFields.entries.map((entry) {
+                    final group = entry.key;
+                    final fields = entry.value..sort((a, b) => a.order.compareTo(b.order));
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSectionHeader(group),
+                        _buildCard(
+                          children: fields.map((field) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: _buildCustomFieldInput(field),
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                    );
+                  }).toList(),
+                );
+              },
             ),
 
             const SizedBox(height: 30),
@@ -308,11 +280,13 @@ class _CreateLeadScreenState extends State<CreateLeadScreen> {
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
+    int maxLines = 1,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       validator: validator,
+      maxLines: maxLines,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: AppColors.primary.withOpacity(0.7)),
@@ -333,5 +307,114 @@ class _CreateLeadScreenState extends State<CreateLeadScreen> {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
     );
+  }
+
+  Widget _buildCustomFieldInput(CustomField field) {
+    // Determine icon based on field type or name
+    IconData icon = Icons.data_usage;
+    TextInputType keyboardType = TextInputType.text;
+
+    if (field.type == 'number') {
+      icon = Icons.numbers;
+      keyboardType = TextInputType.number;
+    } else if (field.type == 'date') {
+      icon = Icons.calendar_today;
+    } else if (field.type == 'textarea') {
+      icon = Icons.note;
+      keyboardType = TextInputType.multiline;
+    } else if (field.type == 'select') {
+      icon = Icons.list;
+    }
+
+    if (field.type == 'select') {
+      return DropdownButtonFormField<String>(
+        decoration: InputDecoration(
+          labelText: field.label + (field.required ? ' *' : ''),
+          prefixIcon: Icon(icon, color: AppColors.primary.withOpacity(0.7)),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: AppColors.border),
+          ),
+          filled: true,
+          fillColor: AppColors.surface,
+        ),
+        value: _customData[field.key], // might be null initially
+        items: field.options.map((opt) {
+          return DropdownMenuItem<String>(
+            value: opt,
+            child: Text(opt),
+          );
+        }).toList(),
+        onChanged: (val) {
+          setState(() {
+            _customData[field.key] = val;
+          });
+        },
+        validator: field.required
+            ? (value) => value == null || value.isEmpty ? 'Required' : null
+            : null,
+      );
+    } else if (field.type == 'date') {
+       // Date Picker field
+       return InkWell(
+        onTap: () async {
+          final DateTime? picked = await showDatePicker(
+            context: context,
+            initialDate: DateTime.now(),
+            firstDate: DateTime(2000),
+            lastDate: DateTime(2100),
+          );
+          if (picked != null) {
+            setState(() {
+               // Store as ISO string
+               _customData[field.key] = picked.toIso8601String();
+               // Also update controller for display if we used one, but here we can just rebuild
+               // But to show text we need a controller or just a read-only input
+            });
+          }
+        },
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: field.label + (field.required ? ' *' : ''),
+            prefixIcon: Icon(icon, color: AppColors.primary.withOpacity(0.7)),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppColors.border),
+            ),
+            filled: true,
+            fillColor: AppColors.surface,
+          ),
+          child: Text(
+            _customData[field.key] != null 
+              ? DateFormat.yMMMd().format(DateTime.parse(_customData[field.key])) 
+              : 'Select Date',
+            style: TextStyle(
+              color: _customData[field.key] != null ? Colors.black : Colors.grey[600]
+            ),
+          ),
+        ),
+      );
+    } else {
+      // Text, Number, Textarea
+      
+      // Ensure controller exists
+      if (!_customControllers.containsKey(field.key)) {
+        _customControllers[field.key] = TextEditingController(text: _customData[field.key]?.toString() ?? '');
+        _customControllers[field.key]!.addListener(() {
+             _customData[field.key] = _customControllers[field.key]!.text;
+        });
+      }
+
+      return _buildTextField(
+        controller: _customControllers[field.key]!,
+        label: field.label + (field.required ? ' *' : ''),
+        icon: icon,
+        keyboardType: keyboardType,
+        maxLines: field.type == 'textarea' ? 3 : 1,
+        validator: field.required
+            ? (value) => value == null || value.isEmpty ? 'Required' : null
+            : null,
+      );
+    }
   }
 }

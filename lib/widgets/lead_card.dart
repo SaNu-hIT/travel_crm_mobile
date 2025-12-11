@@ -78,7 +78,7 @@ class LeadCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (lead.preferredLocation != null) ...[
+                  if (lead.customData['preferredLocation'] != null) ...[
                     const SizedBox(height: 4),
                     Row(
                       children: [
@@ -90,7 +90,7 @@ class LeadCard extends StatelessWidget {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
-                            lead.preferredLocation!,
+                            lead.customData['preferredLocation'].toString(),
                             style: TextStyle(
                               fontSize: 13,
                               color: AppColors.textSecondary.withOpacity(0.9),

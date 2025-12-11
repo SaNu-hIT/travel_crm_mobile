@@ -110,7 +110,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
         return lead.name.toLowerCase().contains(_searchQuery) ||
                lead.phone.toLowerCase().contains(_searchQuery) ||
                (lead.email?.toLowerCase().contains(_searchQuery) ?? false) ||
-               (lead.preferredLocation?.toLowerCase().contains(_searchQuery) ?? false);
+               (lead.customData.values.any((v) => v.toString().toLowerCase().contains(_searchQuery)));
       }).toList();
     }
     
