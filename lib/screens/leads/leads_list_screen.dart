@@ -437,37 +437,64 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                   ...leadProvider.leads.take(5).map((lead) => GestureDetector(
                     onTap: () => _handleLeadTap(lead),
                     child: Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.all(12),
+                        leading: CircleAvatar(
+                          backgroundColor: lead.status.color.withOpacity(0.2),
+                          child: Text(
+                            lead.name.substring(0, 1).toUpperCase(),
+                            style: TextStyle(
+                              color: lead.status.color,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
-                      ],
-                    ),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.all(12),
-                      leading: CircleAvatar(
-                        backgroundColor: lead.status.color.withOpacity(0.2),
-                        child: Text(
-                          lead.name.substring(0, 1).toUpperCase(),
-                          style: TextStyle(
-                            color: lead.status.color,
-                            fontWeight: FontWeight.bold,
+                        title: Text(
+                          lead.name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          lead.phone,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        trailing: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: lead.status.color.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            lead.status.displayName,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: lead.status.color,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ),
-                      title: Text(
-                        lead.name,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                )),
+                    ),
+                  )),
               ]),
             ),
           ),
