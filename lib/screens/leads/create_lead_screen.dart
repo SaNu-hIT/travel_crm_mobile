@@ -58,7 +58,7 @@ class _CreateLeadScreenState extends State<CreateLeadScreen> {
       'phone': _phoneController.text.trim(),
       'email': _emailController.text.trim(),
       'source': _sourceController.text.trim(),
-      'status': 'New', // Default status
+      'status': 'NEW', // Default status must match backend enum
     };
 
     // Add optional fields if they have values
