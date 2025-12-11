@@ -83,8 +83,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
   }
 
   void _handleViewAllStatus() {
-    // Show all status cards - could navigate to a full status grid view
-    // For now, just scroll to status section
+    Navigator.of(context).pushNamed('/all-status');
   }
 
   Map<LeadStatus, int> _getStatusCounts(LeadProvider leadProvider) {
@@ -123,11 +122,20 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
     final authProvider = Provider.of<AuthProvider>(context);
     final leadProvider = Provider.of<LeadProvider>(context);
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: _showingGrid
-          ? _buildDashboard(authProvider, leadProvider)
-          : _buildLeadsList(leadProvider),
+    return WillPopScope(
+      onWillPop: () async {
+        if (!_showingGrid) {
+          _handleBackToGrid();
+          return false;
+        }
+        return true;
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: _showingGrid
+            ? _buildDashboard(authProvider, leadProvider)
+            : _buildLeadsList(leadProvider),
+      ),
     );
   }
 
@@ -227,30 +235,39 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                       const SizedBox(height: 20),
                       
                       // Search Bar
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 10,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: TextField(
-                          controller: _searchController,
-                          decoration: InputDecoration(
-                            hintText: 'Search leads...',
-                            hintStyle: TextStyle(
-                              color: AppColors.textSecondary.withOpacity(0.5),
-                            ),
-                            prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 14,
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _showingGrid = false;
+                          });
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 10,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: AbsorbPointer(
+                            child: TextField(
+                              enabled: false,
+                              decoration: InputDecoration(
+                                hintText: 'Search leads...',
+                                hintStyle: TextStyle(
+                                  color: AppColors.textSecondary.withOpacity(0.5),
+                                ),
+                                prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 14,
+                                ),
+                              ),
                             ),
                           ),
                         ),

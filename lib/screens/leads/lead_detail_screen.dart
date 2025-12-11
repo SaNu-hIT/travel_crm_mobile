@@ -557,12 +557,16 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       builder: (context) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.all(20),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -576,71 +580,76 @@ class _LeadDetailScreenState extends State<LeadDetailScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            ...LeadStatus.values.map((status) {
-              final isSelected = status == lead.status;
-              return GestureDetector(
-                onTap: () {
-                  Navigator.pop(context);
-                  if (status != lead.status) {
-                    _updateStatus(status);
-                  }
-                },
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? status.color.withOpacity(0.1)
-                        : AppColors.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isSelected
-                          ? status.color
-                          : AppColors.border,
-                      width: isSelected ? 2 : 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: LeadStatus.values.map((status) {
+                    final isSelected = status == lead.status;
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                        if (status != lead.status) {
+                          _updateStatus(status);
+                        }
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: status.color.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          _getStatusIcon(status),
-                          color: status.color,
-                          size: 20,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          status.displayName,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: isSelected
-                                ? FontWeight.w600
-                                : FontWeight.normal,
+                          color: isSelected
+                              ? status.color.withOpacity(0.1)
+                              : AppColors.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
                             color: isSelected
                                 ? status.color
-                                : AppColors.textPrimary,
+                                : AppColors.border,
+                            width: isSelected ? 2 : 1,
                           ),
                         ),
-                      ),
-                      if (isSelected)
-                        Icon(
-                          Icons.check_circle,
-                          color: status.color,
-                          size: 24,
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: status.color.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                _getStatusIcon(status),
+                                color: status.color,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                status.displayName,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                  color: isSelected
+                                      ? status.color
+                                      : AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            if (isSelected)
+                              Icon(
+                                Icons.check_circle,
+                                color: status.color,
+                                size: 24,
+                              ),
+                          ],
                         ),
-                    ],
-                  ),
+                      ),
+                    );
+                  }).toList(),
                 ),
-              );
-            }),
-            const SizedBox(height: 20),
+              ),
+            ),
           ],
         ),
       ),

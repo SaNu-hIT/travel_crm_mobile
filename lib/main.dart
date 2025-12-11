@@ -6,6 +6,7 @@ import 'screens/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/leads/leads_list_screen.dart';
 import 'screens/leads/lead_detail_screen.dart';
+import 'screens/leads/all_status_screen.dart';
 import 'utils/theme.dart';
 
 void main() {
@@ -31,6 +32,7 @@ class TravelLMSApp extends StatelessWidget {
           '/': (context) => const SplashScreen(),
           '/login': (context) => const LoginScreen(),
           '/leads': (context) => const LeadsListScreen(),
+          '/all-status': (context) => const AllStatusScreen(),
         },
         onGenerateRoute: (settings) {
           // Handle lead detail route with parameter
