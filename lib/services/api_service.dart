@@ -11,9 +11,7 @@ class ApiService {
   // Get headers with authorization token
   Future<Map<String, String>> getHeaders() async {
     final token = await _storageService.getToken();
-    final headers = {
-      'Content-Type': 'application/json',
-    };
+    final headers = {'Content-Type': 'application/json'};
     if (token != null) {
       headers['Authorization'] = 'Bearer $token';
     }
@@ -27,24 +25,19 @@ class ApiService {
     T Function(dynamic)? fromJson,
   }) async {
     try {
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}$endpoint')
-          .replace(queryParameters: queryParams);
-      
+      final uri = Uri.parse(
+        '${AppConfig.apiBaseUrl}$endpoint',
+      ).replace(queryParameters: queryParams);
+
       final response = await http
           .get(uri, headers: await getHeaders())
           .timeout(Duration(seconds: AppConfig.apiTimeout));
 
       return _handleResponse<T>(response, fromJson);
     } on SocketException {
-      return ApiResponse<T>(
-        success: false,
-        error: 'No internet connection',
-      );
+      return ApiResponse<T>(success: false, error: 'No internet connection');
     } on HttpException {
-      return ApiResponse<T>(
-        success: false,
-        error: 'Server error',
-      );
+      return ApiResponse<T>(success: false, error: 'Server error');
     } catch (e) {
       return ApiResponse<T>(
         success: false,
@@ -61,7 +54,7 @@ class ApiService {
   }) async {
     try {
       final uri = Uri.parse('${AppConfig.apiBaseUrl}$endpoint');
-      
+
       final response = await http
           .post(
             uri,
@@ -72,15 +65,9 @@ class ApiService {
 
       return _handleResponse<T>(response, fromJson);
     } on SocketException {
-      return ApiResponse<T>(
-        success: false,
-        error: 'No internet connection',
-      );
+      return ApiResponse<T>(success: false, error: 'No internet connection');
     } on HttpException {
-      return ApiResponse<T>(
-        success: false,
-        error: 'Server error',
-      );
+      return ApiResponse<T>(success: false, error: 'Server error');
     } catch (e) {
       return ApiResponse<T>(
         success: false,
@@ -97,7 +84,7 @@ class ApiService {
   }) async {
     try {
       final uri = Uri.parse('${AppConfig.apiBaseUrl}$endpoint');
-      
+
       final response = await http
           .put(
             uri,
@@ -108,15 +95,9 @@ class ApiService {
 
       return _handleResponse<T>(response, fromJson);
     } on SocketException {
-      return ApiResponse<T>(
-        success: false,
-        error: 'No internet connection',
-      );
+      return ApiResponse<T>(success: false, error: 'No internet connection');
     } on HttpException {
-      return ApiResponse<T>(
-        success: false,
-        error: 'Server error',
-      );
+      return ApiResponse<T>(success: false, error: 'Server error');
     } catch (e) {
       return ApiResponse<T>(
         success: false,
@@ -132,22 +113,16 @@ class ApiService {
   }) async {
     try {
       final uri = Uri.parse('${AppConfig.apiBaseUrl}$endpoint');
-      
+
       final response = await http
           .delete(uri, headers: await getHeaders())
           .timeout(Duration(seconds: AppConfig.apiTimeout));
 
       return _handleResponse<T>(response, fromJson);
     } on SocketException {
-      return ApiResponse<T>(
-        success: false,
-        error: 'No internet connection',
-      );
+      return ApiResponse<T>(success: false, error: 'No internet connection');
     } on HttpException {
-      return ApiResponse<T>(
-        success: false,
-        error: 'Server error',
-      );
+      return ApiResponse<T>(success: false, error: 'Server error');
     } catch (e) {
       return ApiResponse<T>(
         success: false,
@@ -163,7 +138,7 @@ class ApiService {
   ) {
     try {
       final decoded = jsonDecode(response.body);
-      
+
       // Check if response is a Map (expected format)
       if (decoded is! Map<String, dynamic>) {
         return ApiResponse<T>(
@@ -171,8 +146,8 @@ class ApiService {
           error: 'Invalid response format from server',
         );
       }
-      
-      final responseBody = decoded as Map<String, dynamic>;
+
+      final responseBody = decoded;
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return ApiResponse<T>.fromJson(responseBody, fromJson);

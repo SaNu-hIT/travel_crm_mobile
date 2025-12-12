@@ -1,17 +1,14 @@
 import '../utils/constants.dart';
 import 'comment.dart';
 import 'call_log.dart';
+import 'quotation.dart';
 
 class AssignedUser {
   final String id;
   final String name;
   final String email;
 
-  AssignedUser({
-    required this.id,
-    required this.name,
-    required this.email,
-  });
+  AssignedUser({required this.id, required this.name, required this.email});
 
   factory AssignedUser.fromJson(Map<String, dynamic> json) {
     return AssignedUser(
@@ -56,6 +53,9 @@ class Lead {
   final bool isCustomer;
   final DateTime? convertedAt;
 
+  // Quotation
+  final Quotation? quotation;
+
   Lead({
     required this.id,
     required this.tenantId,
@@ -79,6 +79,7 @@ class Lead {
     required this.createdById,
     this.isCustomer = false,
     this.convertedAt,
+    this.quotation,
   });
 
   factory Lead.fromJson(Map<String, dynamic> json) {
@@ -97,9 +98,7 @@ class Lead {
       status: parseLeadStatus(json['status'] as String),
       source: json['source'] as String,
       category: json['category'] as String?,
-      tags: json['tags'] != null
-          ? List<String>.from(json['tags'] as List)
-          : [],
+      tags: json['tags'] != null ? List<String>.from(json['tags'] as List) : [],
       name: json['name'] as String,
       profileImage: json['profileImage'] as String?,
       phone: json['phone'] as String,
@@ -112,13 +111,13 @@ class Lead {
           : null,
       comments: json['comments'] != null
           ? (json['comments'] as List)
-              .map((c) => LeadComment.fromJson(c as Map<String, dynamic>))
-              .toList()
+                .map((c) => LeadComment.fromJson(c as Map<String, dynamic>))
+                .toList()
           : [],
       callLogs: json['callLogs'] != null
           ? (json['callLogs'] as List)
-              .map((c) => CallLog.fromJson(c as Map<String, dynamic>))
-              .toList()
+                .map((c) => CallLog.fromJson(c as Map<String, dynamic>))
+                .toList()
           : [],
       createdAt: json['createdAt'] != null
           ? DateTime.parse(json['createdAt'] as String)
@@ -132,6 +131,9 @@ class Lead {
       isCustomer: json['isCustomer'] as bool? ?? false,
       convertedAt: json['convertedAt'] != null
           ? DateTime.parse(json['convertedAt'] as String)
+          : null,
+      quotation: json['quotation'] != null
+          ? Quotation.fromJson(json['quotation'] as Map<String, dynamic>)
           : null,
     );
   }
@@ -158,6 +160,7 @@ class Lead {
       'createdById': createdById,
       'isCustomer': isCustomer,
       'convertedAt': convertedAt?.toIso8601String(),
+      'quotation': quotation?.toJson(),
     };
   }
 
@@ -185,6 +188,7 @@ class Lead {
     String? createdById,
     bool? isCustomer,
     DateTime? convertedAt,
+    Quotation? quotation,
   }) {
     return Lead(
       id: id ?? this.id,
@@ -209,6 +213,7 @@ class Lead {
       createdById: createdById ?? this.createdById,
       isCustomer: isCustomer ?? this.isCustomer,
       convertedAt: convertedAt ?? this.convertedAt,
+      quotation: quotation ?? this.quotation,
     );
   }
 }

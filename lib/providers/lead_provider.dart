@@ -10,12 +10,7 @@ import '../models/api_response.dart';
 import '../services/api_service.dart';
 import '../utils/constants.dart';
 
-enum LeadLoadingState {
-  initial,
-  loading,
-  loaded,
-  error,
-}
+enum LeadLoadingState { initial, loading, loaded, error }
 
 class LeadProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -25,12 +20,12 @@ class LeadProvider with ChangeNotifier {
   List<Lead> _leads = [];
   Lead? _currentLead;
   String? _error;
-  
+
   // Pagination
   int _currentPage = 1;
   int _totalPages = 1;
   bool _hasMore = false;
-  
+
   // Filters
   LeadStatus? _statusFilter;
 
@@ -54,7 +49,7 @@ class LeadProvider with ChangeNotifier {
       _leads = [];
       _currentPage = 1;
     }
-    
+
     _error = null;
     notifyListeners();
 
@@ -69,29 +64,32 @@ class LeadProvider with ChangeNotifier {
 
     try {
       // Build query parameters
-      final uri = Uri.parse('${AppConfig.apiBaseUrl}${AppConfig.leadsEndpoint}')
-          .replace(queryParameters: queryParams);
-      
+      final uri = Uri.parse(
+        '${AppConfig.apiBaseUrl}${AppConfig.leadsEndpoint}',
+      ).replace(queryParameters: queryParams);
+
       print('=== API REQUEST DEBUG ===');
       print('Request URL: $uri');
-      
+
       // Get headers with auth token from ApiService
       final headers = await _apiService.getHeaders();
-      
+
       // Make HTTP request directly to get full response
-      final httpResponse = await http.get(uri, headers: headers)
+      final httpResponse = await http
+          .get(uri, headers: headers)
           .timeout(Duration(seconds: AppConfig.apiTimeout));
-      
+
       print('=== API RESPONSE DEBUG ===');
       print('Status code: ${httpResponse.statusCode}');
       print('Response body: ${httpResponse.body}');
-      
+
       if (httpResponse.statusCode >= 200 && httpResponse.statusCode < 300) {
-        final responseBody = jsonDecode(httpResponse.body) as Map<String, dynamic>;
-        
+        final responseBody =
+            jsonDecode(httpResponse.body) as Map<String, dynamic>;
+
         print('Response body keys: ${responseBody.keys}');
         print('Data type: ${responseBody['data'].runtimeType}');
-        
+
         // Parse as PaginatedResponse
         final paginatedResponse = PaginatedResponse<Lead>.fromJson(
           responseBody,
@@ -166,7 +164,7 @@ class LeadProvider with ChangeNotifier {
     if (response.success && response.data != null) {
       _currentLead = response.data;
       _loadingState = LeadLoadingState.loaded;
-      
+
       // Update the lead in the list if it exists
       final index = _leads.indexWhere((l) => l.id == id);
       if (index != -1) {
@@ -192,13 +190,13 @@ class LeadProvider with ChangeNotifier {
 
     if (response.success && response.data != null) {
       _currentLead = response.data;
-      
+
       // Update the lead in the list
       final index = _leads.indexWhere((l) => l.id == id);
       if (index != -1) {
         _leads[index] = response.data!;
       }
-      
+
       notifyListeners();
       return true;
     } else {
@@ -242,13 +240,13 @@ class LeadProvider with ChangeNotifier {
 
     if (response.success && response.data != null) {
       _currentLead = response.data;
-      
+
       // Update the lead in the list
       final index = _leads.indexWhere((l) => l.id == leadId);
       if (index != -1) {
         _leads[index] = response.data!;
       }
-      
+
       notifyListeners();
       return true;
     } else {
@@ -263,14 +261,23 @@ class LeadProvider with ChangeNotifier {
   List<CustomField> get customFields => _customFields;
 
   Future<void> fetchCustomFields() async {
+    print('=== FETCHING CUSTOM FIELDS ===');
     final response = await _apiService.get<List<CustomField>>(
-      '/settings/custom-fields',
-      fromJson: (data) => (data as List).map((e) => CustomField.fromJson(e)).toList(),
+      '/api/settings/custom-fields',
+      fromJson: (data) =>
+          (data as List).map((e) => CustomField.fromJson(e)).toList(),
     );
+
+    print('Custom fields response success: ${response.success}');
+    print('Custom fields data: ${response.data}');
+    print('Custom fields error: ${response.error}');
 
     if (response.success && response.data != null) {
       _customFields = response.data!;
+      print('Custom fields loaded: ${_customFields.length}');
       notifyListeners();
+    } else {
+      print('Failed to load custom fields');
     }
   }
 
@@ -279,16 +286,25 @@ class LeadProvider with ChangeNotifier {
   List<FieldGroup> get fieldGroups => _fieldGroups;
 
   Future<void> fetchFieldGroups() async {
+    print('=== FETCHING FIELD GROUPS ===');
     final response = await _apiService.get<List<FieldGroup>>(
-      '/settings/field-groups',
-      fromJson: (data) => (data as List).map((e) => FieldGroup.fromJson(e)).toList(),
+      '/api/settings/field-groups',
+      fromJson: (data) =>
+          (data as List).map((e) => FieldGroup.fromJson(e)).toList(),
     );
+
+    print('Field groups response success: ${response.success}');
+    print('Field groups data: ${response.data}');
+    print('Field groups error: ${response.error}');
 
     if (response.success && response.data != null) {
       _fieldGroups = response.data!;
       // Sort by order
       _fieldGroups.sort((a, b) => a.order.compareTo(b.order));
+      print('Field groups loaded: ${_fieldGroups.length}');
       notifyListeners();
+    } else {
+      print('Failed to load field groups');
     }
   }
 

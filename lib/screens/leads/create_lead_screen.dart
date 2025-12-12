@@ -19,7 +19,7 @@ class _CreateLeadScreenState extends State<CreateLeadScreen> {
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _sourceController = TextEditingController(text: 'Manual');
-  
+
   // Custom Data State
   final Map<String, dynamic> _customData = {};
   final Map<String, TextEditingController> _customControllers = {};
@@ -54,7 +54,7 @@ class _CreateLeadScreenState extends State<CreateLeadScreen> {
     });
 
     final leadProvider = Provider.of<LeadProvider>(context, listen: false);
-    
+
     final Map<String, dynamic> leadData = {
       'name': _nameController.text.trim(),
       'phone': _phoneController.text.trim(),
@@ -97,7 +97,10 @@ class _CreateLeadScreenState extends State<CreateLeadScreen> {
       appBar: AppBar(
         title: const Text(
           'Create New Lead',
-          style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         backgroundColor: Colors.white,
         elevation: 0,
@@ -149,23 +152,25 @@ class _CreateLeadScreenState extends State<CreateLeadScreen> {
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             const SizedBox(height: 24),
-            
+
             // Dynamic Custom Fields
             Consumer<LeadProvider>(
               builder: (context, leadProvider, child) {
                 if (leadProvider.customFields.isEmpty) {
                   return const SizedBox.shrink();
                 }
-                
+
                 // Group fields
                 final groupedFields = <String, List<CustomField>>{};
                 for (var field in leadProvider.customFields) {
                   if (field.group.isEmpty) {
-                    groupedFields.putIfAbsent('Additional Info', () => []).add(field);
+                    groupedFields
+                        .putIfAbsent('Additional Info', () => [])
+                        .add(field);
                   } else {
                     groupedFields.putIfAbsent(field.group, () => []).add(field);
                   }
@@ -174,7 +179,8 @@ class _CreateLeadScreenState extends State<CreateLeadScreen> {
                 return Column(
                   children: groupedFields.entries.map((entry) {
                     final group = entry.key;
-                    final fields = entry.value..sort((a, b) => a.order.compareTo(b.order));
+                    final fields = entry.value
+                      ..sort((a, b) => a.order.compareTo(b.order));
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -197,7 +203,7 @@ class _CreateLeadScreenState extends State<CreateLeadScreen> {
             ),
 
             const SizedBox(height: 30),
-            
+
             // Submit Button
             SizedBox(
               width: double.infinity,
@@ -300,7 +306,10 @@ class _CreateLeadScreenState extends State<CreateLeadScreen> {
         ),
         filled: true,
         fillColor: AppColors.surface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
       ),
     );
   }
@@ -334,12 +343,9 @@ class _CreateLeadScreenState extends State<CreateLeadScreen> {
           filled: true,
           fillColor: AppColors.surface,
         ),
-        value: _customData[field.key], // might be null initially
+        initialValue: _customData[field.key], // might be null initially
         items: field.options.map((opt) {
-          return DropdownMenuItem<String>(
-            value: opt,
-            child: Text(opt),
-          );
+          return DropdownMenuItem<String>(value: opt, child: Text(opt));
         }).toList(),
         onChanged: (val) {
           setState(() {
@@ -351,8 +357,8 @@ class _CreateLeadScreenState extends State<CreateLeadScreen> {
             : null,
       );
     } else if (field.type == 'date') {
-       // Date Picker field
-       return InkWell(
+      // Date Picker field
+      return InkWell(
         onTap: () async {
           final DateTime? picked = await showDatePicker(
             context: context,
@@ -362,10 +368,10 @@ class _CreateLeadScreenState extends State<CreateLeadScreen> {
           );
           if (picked != null) {
             setState(() {
-               // Store as ISO string
-               _customData[field.key] = picked.toIso8601String();
-               // Also update controller for display if we used one, but here we can just rebuild
-               // But to show text we need a controller or just a read-only input
+              // Store as ISO string
+              _customData[field.key] = picked.toIso8601String();
+              // Also update controller for display if we used one, but here we can just rebuild
+              // But to show text we need a controller or just a read-only input
             });
           }
         },
@@ -381,23 +387,29 @@ class _CreateLeadScreenState extends State<CreateLeadScreen> {
             fillColor: AppColors.surface,
           ),
           child: Text(
-            _customData[field.key] != null 
-              ? DateFormat.yMMMd().format(DateTime.parse(_customData[field.key])) 
-              : 'Select Date',
+            _customData[field.key] != null
+                ? DateFormat.yMMMd().format(
+                    DateTime.parse(_customData[field.key]),
+                  )
+                : 'Select Date',
             style: TextStyle(
-              color: _customData[field.key] != null ? Colors.black : Colors.grey[600]
+              color: _customData[field.key] != null
+                  ? Colors.black
+                  : Colors.grey[600],
             ),
           ),
         ),
       );
     } else {
       // Text, Number, Textarea
-      
+
       // Ensure controller exists
       if (!_customControllers.containsKey(field.key)) {
-        _customControllers[field.key] = TextEditingController(text: _customData[field.key]?.toString() ?? '');
+        _customControllers[field.key] = TextEditingController(
+          text: _customData[field.key]?.toString() ?? '',
+        );
         _customControllers[field.key]!.addListener(() {
-             _customData[field.key] = _customControllers[field.key]!.text;
+          _customData[field.key] = _customControllers[field.key]!.text;
         });
       }
 

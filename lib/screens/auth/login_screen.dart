@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../utils/theme.dart';
 import '../../utils/constants.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -27,7 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleLogin() async {
     if (_formKey.currentState!.validate()) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
+
       final success = await authProvider.login(
         _emailController.text.trim(),
         _passwordController.text,
@@ -78,8 +77,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   Text(
                     'Employee Portal',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
+                      color: AppColors.textSecondary,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 48),
