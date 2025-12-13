@@ -11,6 +11,8 @@ import '../../utils/helpers.dart';
 import '../../widgets/comment_item.dart';
 import '../../widgets/add_comment_dialog.dart';
 import '../../widgets/lead_conversion_dialog.dart';
+import 'quote_editor_screen.dart';
+import '../../models/call_log.dart' as app_call_log;
 
 class LeadDetailScreen extends StatefulWidget {
   final String leadId;
@@ -31,6 +33,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
   // For complex objects, we might need a more robust approach, but for this form simple map works.
   final Map<String, dynamic> _formData = {};
 
+  @override
   @override
   void initState() {
     super.initState();
@@ -330,9 +333,9 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
                     unselectedLabelColor: AppColors.textSecondary,
                     indicatorColor: AppColors.primary,
                     tabs: const [
-                      Tab(text: 'Overview'),
-                      Tab(text: 'Activity'),
-                      Tab(text: 'Quotation'),
+                      Tab(icon: Icon(Icons.info_outline), text: 'Overview'),
+                      Tab(icon: Icon(Icons.history), text: 'Activity'),
+                      Tab(icon: Icon(Icons.receipt_long), text: 'Quotation'),
                     ],
                   ),
                 ),
@@ -417,38 +420,49 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
               (log) => Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
+                  minVerticalPadding: 16,
                   leading: CircleAvatar(
-                    backgroundColor: log.callType == 'MISSED'
+                    backgroundColor:
+                        log.callType == app_call_log.CallType.missed
                         ? Colors.red.withOpacity(0.1)
-                        : log.callType == 'INCOMING'
+                        : log.callType == app_call_log.CallType.incoming
                         ? Colors.green.withOpacity(0.1)
                         : Colors.blue.withOpacity(0.1),
                     child: Icon(
-                      log.callType == 'MISSED'
+                      log.callType == app_call_log.CallType.missed
                           ? Icons.call_missed
-                          : log.callType == 'INCOMING'
+                          : log.callType == app_call_log.CallType.incoming
                           ? Icons.call_received
                           : Icons.call_made,
-                      color: log.callType == 'MISSED'
+                      color: log.callType == app_call_log.CallType.missed
                           ? Colors.red
-                          : log.callType == 'INCOMING'
+                          : log.callType == app_call_log.CallType.incoming
                           ? Colors.green
                           : Colors.blue,
                       size: 16,
                     ),
                   ),
                   title: Text(
-                    log.callType == 'MISSED'
+                    log.callType == app_call_log.CallType.missed
                         ? 'Missed Call'
-                        : log.callType == 'INCOMING'
+                        : log.callType == app_call_log.CallType.incoming
                         ? 'Incoming Call'
                         : 'Outgoing Call',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
                   ),
                   subtitle: Text(
                     DateFormat('MMM d, h:mm a').format(log.createdAt.toLocal()),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                   trailing: Text(
                     '${log.duration ~/ 60}m ${log.duration % 60}s',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
               ),
@@ -477,9 +491,25 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
   }
 
   Widget _buildQuotationTab(Lead lead) {
+    // Show empty state if no quote, but include a button to create one
     if (lead.quotation == null) {
       return Center(
-        child: _buildEmptyState('No quotation generated', Icons.receipt_long),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _buildEmptyState('No quotation generated', Icons.receipt_long),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () => _openQuoteEditor(lead),
+              icon: const Icon(Icons.add),
+              label: const Text('Create Quote'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
       );
     }
 
@@ -490,7 +520,22 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Manage Quote Button
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton.icon(
+              onPressed: () => _openQuoteEditor(lead),
+              icon: const Icon(Icons.edit, size: 16),
+              label: const Text('Manage Quote'),
+            ),
+          ),
+          const SizedBox(height: 10),
+
           Card(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            elevation: 2,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -500,12 +545,12 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
                     children: [
                       const Text(
                         'Status',
-                        style: TextStyle(color: Colors.grey),
+                        style: TextStyle(color: Colors.grey, fontSize: 14),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
-                          vertical: 2,
+                          vertical: 4,
                         ),
                         decoration: BoxDecoration(
                           color: quote.status == 'DRAFT'
@@ -524,7 +569,8 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
                             color: quote.status == 'DRAFT'
                                 ? Colors.orange
                                 : Colors.green,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12,
                           ),
                         ),
                       ),
@@ -562,20 +608,30 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
           ),
           const SizedBox(height: 10),
           Card(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: quote.items.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
+              separatorBuilder: (_, __) =>
+                  const Divider(height: 1, indent: 16, endIndent: 16),
               itemBuilder: (context, index) {
                 final item = quote.items[index];
                 return ListTile(
-                  title: Text(item.description),
+                  title: Text(
+                    item.description,
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
                   trailing: Text(
                     '₹${(item.amount * item.quantity).toStringAsFixed(0)}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  subtitle: Text('${item.quantity} x ₹${item.amount}'),
+                  subtitle: Text(
+                    '${item.quantity} x ₹${item.amount}',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
                 );
               },
             ),
@@ -588,15 +644,61 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
             ),
             const SizedBox(height: 10),
             Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Text(quote.notes!),
               ),
             ),
           ],
+
+          const SizedBox(height: 20),
+          if (quote.status == 'DRAFT')
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  // Logic to finalize/send could go here, or just let them manage it via web
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Use web to generate final PDF'),
+                    ),
+                  );
+                },
+                child: const Text('View PDF (Web Only)'),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  void _openQuoteEditor(Lead lead) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => QuoteEditorScreen(
+          currentQuote: lead.quotation,
+          onSave: (updatedQuote) {
+            _handleQuoteUpdate(updatedQuote);
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleQuoteUpdate(Quotation updatedQuote) async {
+    try {
+      final leadProvider = Provider.of<LeadProvider>(context, listen: false);
+      await leadProvider.updateLead(widget.leadId, {
+        'quotation': updatedQuote.toJson(),
+      });
+      _showSnackBar(true, 'Quotation saved');
+    } catch (e) {
+      _showSnackBar(false, 'Failed to save quotation');
+    }
   }
 
   Widget _buildEmptyState(String message, IconData icon) {

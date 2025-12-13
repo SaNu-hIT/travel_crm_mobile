@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/lead_provider.dart';
 import '../../utils/constants.dart';
 import '../../widgets/lead_card.dart';
+import '../../services/sync_service.dart';
 
 class LeadsListScreen extends StatefulWidget {
   const LeadsListScreen({super.key});
@@ -20,14 +21,21 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
   bool _showingGrid = true;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<LeadProvider>(context, listen: false).fetchLeads();
+      final leadProvider = Provider.of<LeadProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+      leadProvider.fetchLeads().then((_) {
+        // Trigger global sync after leads are fetched
+        if (authProvider.user != null) {
+          SyncService().syncGlobalCallLogs(leadProvider, authProvider.user);
+        }
+      });
     });
-    
+
     // Add search listener
     _searchController.addListener(() {
       setState(() {
@@ -98,22 +106,26 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
 
   List<Lead> _getFilteredLeads(LeadProvider leadProvider) {
     var leads = leadProvider.leads;
-    
+
     // Apply status filter
     if (leadProvider.statusFilter != null) {
-      leads = leads.where((lead) => lead.status == leadProvider.statusFilter).toList();
+      leads = leads
+          .where((lead) => lead.status == leadProvider.statusFilter)
+          .toList();
     }
-    
+
     // Apply search filter
     if (_searchQuery.isNotEmpty) {
       leads = leads.where((lead) {
         return lead.name.toLowerCase().contains(_searchQuery) ||
-               lead.phone.toLowerCase().contains(_searchQuery) ||
-               (lead.email?.toLowerCase().contains(_searchQuery) ?? false) ||
-               (lead.customData.values.any((v) => v.toString().toLowerCase().contains(_searchQuery)));
+            lead.phone.toLowerCase().contains(_searchQuery) ||
+            (lead.email?.toLowerCase().contains(_searchQuery) ?? false) ||
+            (lead.customData.values.any(
+              (v) => v.toString().toLowerCase().contains(_searchQuery),
+            ));
       }).toList();
     }
-    
+
     return leads;
   }
 
@@ -150,10 +162,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
   }
 
   void _handleLeadTap(Lead lead) {
-    Navigator.of(context).pushNamed(
-      '/lead-detail',
-      arguments: lead.id,
-    );
+    Navigator.of(context).pushNamed('/lead-detail', arguments: lead.id);
   }
 
   Widget _buildDashboard(AuthProvider authProvider, LeadProvider leadProvider) {
@@ -199,7 +208,10 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                             radius: 24,
                             backgroundColor: AppColors.primary,
                             child: Text(
-                              authProvider.user?.name.substring(0, 1).toUpperCase() ?? 'U',
+                              authProvider.user?.name
+                                      .substring(0, 1)
+                                      .toUpperCase() ??
+                                  'U',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 20,
@@ -238,7 +250,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Title
                       const Text(
                         'Track and Manage\nYour Leads',
@@ -250,7 +262,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      
+
                       // Search Bar
                       GestureDetector(
                         onTap: () {
@@ -276,9 +288,14 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                               decoration: InputDecoration(
                                 hintText: 'Search leads...',
                                 hintStyle: TextStyle(
-                                  color: AppColors.textSecondary.withOpacity(0.5),
+                                  color: AppColors.textSecondary.withOpacity(
+                                    0.5,
+                                  ),
                                 ),
-                                prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                                prefixIcon: const Icon(
+                                  Icons.search,
+                                  color: AppColors.textSecondary,
+                                ),
                                 border: InputBorder.none,
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 8,
@@ -340,11 +357,9 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 24),
-                
-       
-                
+
                 // Lead Status Section
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -363,8 +378,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                     ),
                   ],
                 ),
-         
-                
+
                 // Status Grid
                 GridView.builder(
                   shrinkWrap: true,
@@ -372,7 +386,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     crossAxisSpacing: 12, // Standardized to 12
-                    mainAxisSpacing: 12,  // Standardized to 12
+                    mainAxisSpacing: 12, // Standardized to 12
                     childAspectRatio: 1.6,
                   ),
                   itemCount: 4, // Show only top 4 statuses
@@ -388,9 +402,9 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                     return _buildStatusCard(status, count);
                   },
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // Recent Leads
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -410,91 +424,105 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Recent Leads List
                 if (leadProvider.leads.isEmpty)
                   if (leadProvider.loadingState == LeadLoadingState.loading)
-                     const Center(child: Padding(
-                       padding: EdgeInsets.all(20.0),
-                       child: CircularProgressIndicator(),
-                     ))
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
                   else
                     Container(
                       padding: const EdgeInsets.all(30),
                       alignment: Alignment.center,
                       child: Column(
                         children: [
-                          Icon(Icons.inbox_outlined, size: 48, color: AppColors.textSecondary.withOpacity(0.5)),
+                          Icon(
+                            Icons.inbox_outlined,
+                            size: 48,
+                            color: AppColors.textSecondary.withOpacity(0.5),
+                          ),
                           const SizedBox(height: 12),
                           Text(
                             'No recent leads',
-                            style: TextStyle(color: AppColors.textSecondary.withOpacity(0.8)),
+                            style: TextStyle(
+                              color: AppColors.textSecondary.withOpacity(0.8),
+                            ),
                           ),
                         ],
                       ),
                     )
                 else
-                  ...leadProvider.leads.take(5).map((lead) => GestureDetector(
-                    onTap: () => _handleLeadTap(lead),
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.all(12),
-                        leading: CircleAvatar(
-                          backgroundColor: lead.status.color.withOpacity(0.2),
-                          child: Text(
-                            lead.name.substring(0, 1).toUpperCase(),
-                            style: TextStyle(
-                              color: lead.status.color,
-                              fontWeight: FontWeight.bold,
+                  ...leadProvider.leads
+                      .take(5)
+                      .map(
+                        (lead) => GestureDetector(
+                          onTap: () => _handleLeadTap(lead),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: ListTile(
+                              contentPadding: const EdgeInsets.all(12),
+                              leading: CircleAvatar(
+                                backgroundColor: lead.status.color.withOpacity(
+                                  0.2,
+                                ),
+                                child: Text(
+                                  lead.name.substring(0, 1).toUpperCase(),
+                                  style: TextStyle(
+                                    color: lead.status.color,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                lead.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              subtitle: Text(
+                                lead.phone,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              trailing: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: lead.status.color.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  lead.status.displayName,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: lead.status.color,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                        title: Text(
-                          lead.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        subtitle: Text(
-                          lead.phone,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                        trailing: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: lead.status.color.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            lead.status.displayName,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: lead.status.color,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
                       ),
-                    ),
-                  )),
               ]),
             ),
           ),
@@ -585,14 +613,11 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
     return GestureDetector(
       onTap: () => _handleStatusCardTap(status),
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: status.color.withOpacity(0.2),
-            width: 1,
-          ),
+          border: Border.all(color: status.color.withOpacity(0.2), width: 1),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
@@ -605,7 +630,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
                 color: status.color.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
@@ -613,19 +638,19 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
               child: Icon(
                 _getStatusIcon(status),
                 color: status.color,
-                size: 24,
+                size: 20,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
               count.toString(),
               style: TextStyle(
-                fontSize: 24,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: status.color,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 2),
             Text(
               status.displayName,
               style: const TextStyle(
@@ -707,10 +732,16 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
                   hintStyle: TextStyle(
                     color: AppColors.textSecondary.withOpacity(0.5),
                   ),
-                  prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+                  prefixIcon: const Icon(
+                    Icons.search,
+                    color: AppColors.textSecondary,
+                  ),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear, color: AppColors.textSecondary),
+                          icon: const Icon(
+                            Icons.clear,
+                            color: AppColors.textSecondary,
+                          ),
                           onPressed: () {
                             _searchController.clear();
                             setState(() {
@@ -728,34 +759,38 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
               ),
             ),
           ),
-          
+
           // Leads List
           Expanded(
-            child: leadProvider.loadingState == LeadLoadingState.loading &&
+            child:
+                leadProvider.loadingState == LeadLoadingState.loading &&
                     leadProvider.leads.isEmpty
                 ? const Center(child: CircularProgressIndicator())
                 : leadProvider.loadingState == LeadLoadingState.error
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.error_outline,
-                                size: 64, color: AppColors.error),
-                            const SizedBox(height: 16),
-                            Text(
-                              leadProvider.error ?? 'An error occurred',
-                              style: Theme.of(context).textTheme.bodyLarge,
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: () => leadProvider.refreshLeads(),
-                              child: const Text('Retry'),
-                            ),
-                          ],
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          size: 64,
+                          color: AppColors.error,
                         ),
-                      )
-                    : _buildFilteredLeadsList(leadProvider),
+                        const SizedBox(height: 16),
+                        Text(
+                          leadProvider.error ?? 'An error occurred',
+                          style: Theme.of(context).textTheme.bodyLarge,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () => leadProvider.refreshLeads(),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  )
+                : _buildFilteredLeadsList(leadProvider),
           ),
         ],
       ),
@@ -777,13 +812,11 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              _searchQuery.isNotEmpty 
+              _searchQuery.isNotEmpty
                   ? 'No leads found for "$_searchQuery"'
                   : 'No leads found',
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-              ),
+              style: const TextStyle(color: AppColors.textSecondary),
             ),
           ],
         ),
@@ -807,10 +840,9 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
           return LeadCard(
             lead: lead,
             onTap: () {
-              Navigator.of(context).pushNamed(
-                '/lead-detail',
-                arguments: lead.id,
-              );
+              Navigator.of(
+                context,
+              ).pushNamed('/lead-detail', arguments: lead.id);
             },
           );
         },

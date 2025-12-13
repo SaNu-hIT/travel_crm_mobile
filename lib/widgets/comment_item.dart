@@ -7,69 +7,60 @@ class CommentItem extends StatelessWidget {
   final LeadComment comment;
   final bool isLast;
 
-  const CommentItem({
-    super.key,
-    required this.comment,
-    this.isLast = false,
-  });
+  const CommentItem({super.key, required this.comment, this.isLast = false});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Timeline indicator
-        Column(
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Container(
-              width: 12,
-              height: 12,
-              decoration: const BoxDecoration(
+            // Icon
+            CircleAvatar(
+              radius: 16,
+              backgroundColor: AppColors.primary.withOpacity(0.1),
+              child: const Icon(
+                Icons.comment,
+                size: 16,
                 color: AppColors.primary,
-                shape: BoxShape.circle,
               ),
             ),
-            if (!isLast)
-              Container(
-                width: 2,
-                height: 60,
-                color: AppColors.border,
-              ),
-          ],
-        ),
-        const SizedBox(width: 16),
+            const SizedBox(width: 16),
 
-        // Comment content
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // User name and time
-              Row(
+            // Comment content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    comment.userName,
-                    style: Theme.of(context).textTheme.titleMedium,
+                  Row(
+                    children: [
+                      Text(
+                        comment.userName,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        formatRelativeTime(comment.createdAt),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(height: 4),
                   Text(
-                    formatRelativeTime(comment.createdAt),
-                    style: Theme.of(context).textTheme.bodySmall,
+                    comment.comment,
+                    style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
-
-              // Comment text
-              Text(
-                comment.comment,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

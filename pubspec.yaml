@@ -56,6 +56,10 @@ dependencies:
   # URL launcher
   url_launcher: ^6.2.4
 
+  # Device Call Logs
+  call_log: ^6.0.0
+  permission_handler: ^11.3.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
