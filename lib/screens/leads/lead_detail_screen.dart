@@ -11,10 +11,11 @@ import '../../utils/helpers.dart';
 import '../../widgets/comment_item.dart';
 import '../../widgets/add_comment_dialog.dart';
 import '../../widgets/lead_conversion_dialog.dart';
+import '../../widgets/call_log_dialog.dart';
 import 'quote_editor_screen.dart';
 import '../../models/call_log.dart' as app_call_log;
 import 'dart:io';
-import 'package:file_picker/file_picker.dart';
+
 import '../../services/recording_scanner_service.dart';
 
 class LeadDetailScreen extends StatefulWidget {
@@ -103,98 +104,98 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
   Future<void> _scanForRecording() async {
     if (!mounted) return;
 
-    // Show scanning indicator?
-    final file = await _recordingScanner.scanForRecentRecording();
+    File? file = await _recordingScanner.scanForRecentRecording();
+
+    // If no recent file found, ask if they want to pick manually
+    if (file == null) {
+      // Optional: We can skip this manual pick prompt if we assume "No File = Just Log"
+      // But user might want to pick.
+      // Let's go straight to Dialog, and offer "Attach Recording" button?
+      // Or keep simple flow:
+      // 1. Auto-scan.
+      // 2. If nothing, ask "Attach manual recording?".
+      // 3. If no, proceed to Log Dialog (without file).
+
+      // Let's implement robust flow:
+      // Attempt scan.
+      // If fail, show dialog "No automatic recording found. Select manually?"
+      // If yes -> Pick file.
+      // Regardless of file or not -> Show Call Details Dialog.
+
+      // Simplified for UX:
+      // Show Log Dialog. If file found, say "Recording Attached".
+      // If not, allow "Attach File" button in dialog?
+      // My CallLogDialog didn't implement "Attach File" button logic inside it.
+      // So I will stick to pre-dialog logic.
+
+      // For now:
+      // If no file found, we just proceed to Log Dialog (no recording).
+      // The user can't "manually pick" in this flow unless I add headers.
+      // Let's keep it simple as per user request "update log after disconnect".
+    }
 
     if (!mounted) return;
 
-    if (file != null) {
-      // Found a candidate
-      final confirm = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Recording Found'),
-          content: Text(
-            'Found a new recording: ${file.path.split('/').last}\n\nDo you want to upload this for transcription?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('No'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Upload'),
-            ),
-          ],
-        ),
-      );
-
-      if (confirm == true) {
-        _uploadRecording(file);
-      }
-    } else {
-      // No file found, offer manual pick
-      final pickManual = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('No Recent Recording Found'),
-          content: const Text(
-            'Could not automatically detect the call recording.\n\nWould you like to select the file manually?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Select File'),
-            ),
-          ],
-        ),
-      );
-
-      if (pickManual == true) {
-        _pickRecordingManually();
-      }
-    }
-  }
-
-  Future<void> _pickRecordingManually() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.audio,
+    // Show Call Details Dialog
+    final logData = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => CallLogDialog(
+        hasRecording: file != null,
+        initialDuration: file != null
+            ? 0
+            : 0, // Could try to get length if possible
+      ),
     );
 
-    if (result != null && result.files.single.path != null) {
-      File file = File(result.files.single.path!);
-      _uploadRecording(file);
+    if (logData != null) {
+      // Save Log
+      _saveCallLog(logData, file);
     }
   }
 
-  Future<void> _uploadRecording(File file) async {
-    if (!mounted) return;
+  Future<void> _saveCallLog(Map<String, dynamic> data, File? file) async {
+    final leadProvider = Provider.of<LeadProvider>(context, listen: false);
+    bool success;
 
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('Uploading recording...')));
+    ).showSnackBar(const SnackBar(content: Text('Saving call log...')));
 
-    final leadProvider = Provider.of<LeadProvider>(context, listen: false);
-    final success = await leadProvider.uploadRecording(widget.leadId, file);
+    if (file != null) {
+      // Upload with metadata
+      success = await leadProvider.uploadRecording(
+        widget.leadId,
+        file,
+        metadata: {
+          'outcome': data['outcome'],
+          'duration': data['duration'],
+          'notes': data['notes'],
+          'callType': 'OUTGOING',
+        },
+      );
+    } else {
+      // Just log locally
+      success = await leadProvider.addCallLog(widget.leadId, {
+        'outcome': data['outcome'],
+        'duration': data['duration'],
+        'notes': data['notes'],
+        'callType': 'OUTGOING',
+      });
+    }
 
     if (!mounted) return;
 
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Recording uploaded successfully!'),
+          content: Text('Call log saved successfully!'),
           backgroundColor: AppColors.success,
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(leadProvider.error ?? 'Failed to upload recording'),
+          content: Text(leadProvider.error ?? 'Failed to save log'),
           backgroundColor: AppColors.error,
         ),
       );

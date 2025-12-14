@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RecordingScannerService {
   /// Scans common recording directories for audio files created in the last [duration].
@@ -14,15 +15,26 @@ class RecordingScannerService {
       await Permission.storage.request();
     }
 
-    // 2. Define common paths (Android)
+    // 2. Load Custom Path
+    final prefs = await SharedPreferences.getInstance();
+    final customPath = prefs.getString('recording_path');
+
+    // 3. Define common paths (Android)
     // Note: Scoped Storage limits access, but standard Music/Recordings folders might be accessible via READ_MEDIA_AUDIO
-    final List<String> candidatePaths = [
+    final List<String> candidatePaths = [];
+
+    if (customPath != null && customPath.isNotEmpty) {
+      candidatePaths.add(customPath);
+    }
+
+    // Add default paths as fallbacks (or primary if no custom path)
+    candidatePaths.addAll([
       '/storage/emulated/0/Recordings',
       '/storage/emulated/0/Music/Recordings',
       '/storage/emulated/0/MIUI/sound_recorder/call_rec',
       '/storage/emulated/0/CallRecordings',
       '/storage/emulated/0/Sounds',
-    ];
+    ]);
 
     File? mostRecentFile;
     DateTime? mostRecentTime;

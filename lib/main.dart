@@ -4,6 +4,7 @@ import 'providers/auth_provider.dart';
 import 'providers/lead_provider.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/setup/permission_screen.dart';
 import 'screens/leads/leads_list_screen.dart';
 import 'screens/leads/lead_detail_screen.dart';
 import 'screens/leads/all_status_screen.dart';
@@ -32,6 +33,7 @@ class TravelLMSApp extends StatelessWidget {
         routes: {
           '/': (context) => const SplashScreen(),
           '/login': (context) => const LoginScreen(),
+          '/setup': (context) => const PermissionScreen(),
           '/leads': (context) => const LeadsListScreen(),
           '/all-status': (context) => const AllStatusScreen(),
           '/create-lead': (context) => const CreateLeadScreen(),

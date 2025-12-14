@@ -320,8 +320,40 @@ class LeadProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Upload Recording
-  Future<bool> uploadRecording(String leadId, File file) async {
+  // Add Call Log (No Recording)
+  Future<bool> addCallLog(String leadId, Map<String, dynamic> logData) async {
+    _error = null;
+    notifyListeners();
+
+    final response = await _apiService.post<Lead>(
+      '${AppConfig.leadsEndpoint}/$leadId/call-logs',
+      body: logData,
+      fromJson: (data) => Lead.fromJson(data as Map<String, dynamic>),
+    );
+
+    if (response.success && response.data != null) {
+      // Re-fetch lead to ensure consistency or just trust response
+      // Response returns updated Lead object usually
+      _currentLead = response.data;
+      final index = _leads.indexWhere((l) => l.id == leadId);
+      if (index != -1) {
+        _leads[index] = response.data!;
+      }
+      notifyListeners();
+      return true;
+    } else {
+      _error = response.error ?? 'Failed to add call log';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Upload Recording with Metadata
+  Future<bool> uploadRecording(
+    String leadId,
+    File file, {
+    Map<String, dynamic>? metadata,
+  }) async {
     _error = null;
     notifyListeners();
 
@@ -329,6 +361,9 @@ class LeadProvider with ChangeNotifier {
       '${AppConfig.leadsEndpoint}/$leadId/recording',
       file: file,
       fileField: 'file',
+      fields: metadata?.map(
+        (key, value) => MapEntry(key, value.toString()),
+      ), // Convert values to strings for multipart
       fromJson: (data) => data as Map<String, dynamic>,
     );
 
