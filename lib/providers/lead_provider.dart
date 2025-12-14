@@ -319,4 +319,27 @@ class LeadProvider with ChangeNotifier {
     _currentLead = null;
     notifyListeners();
   }
+
+  // Upload Recording
+  Future<bool> uploadRecording(String leadId, File file) async {
+    _error = null;
+    notifyListeners();
+
+    final response = await _apiService.postMultipart<Map<String, dynamic>>(
+      '${AppConfig.leadsEndpoint}/$leadId/recording',
+      file: file,
+      fileField: 'file',
+      fromJson: (data) => data as Map<String, dynamic>,
+    );
+
+    if (response.success) {
+      // Maybe reload lead to show new status/log?
+      // For now just return true
+      return true;
+    } else {
+      _error = response.error ?? 'Failed to upload recording';
+      notifyListeners();
+      return false;
+    }
+  }
 }

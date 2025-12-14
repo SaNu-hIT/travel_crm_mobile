@@ -42,7 +42,7 @@ dependencies:
   http: ^1.1.2
   
   # Secure storage
-  flutter_secure_storage: ^9.0.0
+  flutter_secure_storage: ^10.0.0
   
   # Local storage
   shared_preferences: ^2.2.2
@@ -58,7 +58,8 @@ dependencies:
 
   # Device Call Logs
   call_log: ^6.0.0
-  permission_handler: ^11.3.1
+  permission_handler: ^12.0.0
+  file_picker: ^8.0.0
 
 dev_dependencies:
   flutter_test:

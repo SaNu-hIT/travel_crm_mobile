@@ -13,6 +13,9 @@ import '../../widgets/add_comment_dialog.dart';
 import '../../widgets/lead_conversion_dialog.dart';
 import 'quote_editor_screen.dart';
 import '../../models/call_log.dart' as app_call_log;
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
+import '../../services/recording_scanner_service.dart';
 
 class LeadDetailScreen extends StatefulWidget {
   final String leadId;
@@ -23,59 +26,178 @@ class LeadDetailScreen extends StatefulWidget {
   State<LeadDetailScreen> createState() => _LeadDetailScreenState();
 }
 
+// ... imports ...
+
 class _LeadDetailScreenState extends State<LeadDetailScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tabController;
   bool _isEditing = false;
   final _formKey = GlobalKey<FormState>();
 
+  // Call Recording Logic
+  bool _isCalling = false;
+  final _recordingScanner = RecordingScannerService();
+
   // Use a map to store editable data.
-  // For complex objects, we might need a more robust approach, but for this form simple map works.
   final Map<String, dynamic> _formData = {};
 
   @override
-  @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadData();
     });
   }
 
-  void _loadData() {
-    final provider = Provider.of<LeadProvider>(context, listen: false);
-    provider.fetchLeadById(widget.leadId).then((_) {
-      // Initialize form data when lead is loaded
-      if (provider.currentLead != null) {
-        _initializeFormData(provider.currentLead!);
-      }
-    });
-    provider.fetchCustomFields();
-    provider.fetchFieldGroups();
+  Future<void> _loadData() async {
+    final leadProvider = Provider.of<LeadProvider>(context, listen: false);
+    await Future.wait([
+      leadProvider.fetchLeadById(widget.leadId),
+      leadProvider.fetchCustomFields(),
+      leadProvider.fetchFieldGroups(),
+    ]);
+    if (mounted && leadProvider.currentLead != null) {
+      _initializeFormData(leadProvider.currentLead!);
+    }
   }
 
   void _initializeFormData(Lead lead) {
-    setState(() {
-      _formData['name'] = lead.name;
-      _formData['phone'] = lead.phone;
-      _formData['email'] = lead.email ?? '';
-      _formData['source'] = lead.source;
-      _formData['category'] = lead.category ?? '';
-      _formData['customData'] = Map<String, dynamic>.from(lead.customData);
-    });
+    _formData['name'] = lead.name;
+    _formData['phone'] = lead.phone;
+    _formData['email'] = lead.email;
+    _formData['source'] = lead.source;
+    _formData['category'] = lead.category;
+    _formData['customData'] = Map<String, dynamic>.from(lead.customData);
   }
+
+  // ... existing code ...
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _isCalling) {
+      _isCalling = false;
+      // Give a small delay for file system to update
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) _scanForRecording();
+      });
+    }
   }
 
   Future<void> _makePhoneCall(String phoneNumber) async {
     final uri = Uri(scheme: 'tel', path: phoneNumber);
     if (await canLaunchUrl(uri)) {
+      _isCalling = true; // Set flag before launching
       await launchUrl(uri);
+    }
+  }
+
+  Future<void> _scanForRecording() async {
+    if (!mounted) return;
+
+    // Show scanning indicator?
+    final file = await _recordingScanner.scanForRecentRecording();
+
+    if (!mounted) return;
+
+    if (file != null) {
+      // Found a candidate
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Recording Found'),
+          content: Text(
+            'Found a new recording: ${file.path.split('/').last}\n\nDo you want to upload this for transcription?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('No'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Upload'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm == true) {
+        _uploadRecording(file);
+      }
+    } else {
+      // No file found, offer manual pick
+      final pickManual = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('No Recent Recording Found'),
+          content: const Text(
+            'Could not automatically detect the call recording.\n\nWould you like to select the file manually?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Select File'),
+            ),
+          ],
+        ),
+      );
+
+      if (pickManual == true) {
+        _pickRecordingManually();
+      }
+    }
+  }
+
+  Future<void> _pickRecordingManually() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.audio,
+    );
+
+    if (result != null && result.files.single.path != null) {
+      File file = File(result.files.single.path!);
+      _uploadRecording(file);
+    }
+  }
+
+  Future<void> _uploadRecording(File file) async {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Uploading recording...')));
+
+    final leadProvider = Provider.of<LeadProvider>(context, listen: false);
+    final success = await leadProvider.uploadRecording(widget.leadId, file);
+
+    if (!mounted) return;
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Recording uploaded successfully!'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(leadProvider.error ?? 'Failed to upload recording'),
+          backgroundColor: AppColors.error,
+        ),
+      );
     }
   }
 

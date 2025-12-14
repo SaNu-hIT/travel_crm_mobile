@@ -179,4 +179,50 @@ class ApiService {
       );
     }
   }
+
+  // Multipart POST request
+  Future<ApiResponse<T>> postMultipart<T>(
+    String endpoint, {
+    required File file,
+    required String fileField,
+    Map<String, String>? fields,
+    T Function(dynamic)? fromJson,
+  }) async {
+    try {
+      final uri = Uri.parse('${AppConfig.apiBaseUrl}$endpoint');
+      final request = http.MultipartRequest('POST', uri);
+
+      // Headers (Auth)
+      final headers = await getHeaders();
+      // Remove Content-Type as MultipartRequest sets it automatically with boundary
+      headers.remove('Content-Type');
+      request.headers.addAll(headers);
+
+      // File
+      request.files.add(
+        await http.MultipartFile.fromPath(fileField, file.path),
+      );
+
+      // Fields
+      if (fields != null) {
+        request.fields.addAll(fields);
+      }
+
+      final streamResponse = await request.send().timeout(
+        Duration(seconds: AppConfig.apiTimeout * 2),
+      ); // Longer timeout for upload
+      final response = await http.Response.fromStream(streamResponse);
+
+      return _handleResponse<T>(response, fromJson);
+    } on SocketException {
+      return ApiResponse<T>(success: false, error: 'No internet connection');
+    } on HttpException {
+      return ApiResponse<T>(success: false, error: 'Server error');
+    } catch (e) {
+      return ApiResponse<T>(
+        success: false,
+        error: 'An error occurred: ${e.toString()}',
+      );
+    }
+  }
 }
