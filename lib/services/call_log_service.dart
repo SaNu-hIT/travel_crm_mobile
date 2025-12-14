@@ -15,28 +15,27 @@ class CallLogService {
     return result.isGranted;
   }
 
-  /// Fetches call logs from the device.
+  /// Fetches call logs from the device (last 60 days).
   /// If [phoneNumber] is provided, filters the logs for that specific number.
   Future<Iterable<CallLogEntry>> fetchCallLogs({String? phoneNumber}) async {
     final hasPermission = await checkPermission();
     if (!hasPermission) {
-      throw Exception('Permission denied');
+      print('CallLogService: Permission denied');
+      return [];
     }
 
-    // Fetch logs
-    // We fetch all and filter manually if needed because query limitations can vary across devices
-    // However, CallLog.query supports basic filtering.
+    // Optimization: Fetch only logs from the last 60 days
+    final now = DateTime.now();
+    final fromDate = now.subtract(const Duration(days: 60));
+    final fromTimestamp = fromDate.millisecondsSinceEpoch;
+
+    // Use query to filter by date at native level
+    // This helps avoid Parcel errors on very old/corrupt logs
+    var entries = await CallLog.query(dateFrom: fromTimestamp);
 
     if (phoneNumber != null) {
-      // Clean the phone number for better matching (remove spaces, dashes)
-      // This is a naive cleanup.
       final cleanNumber = phoneNumber.replaceAll(RegExp(r'[^0-9+]'), '');
 
-      // Attempt to query with number
-      // verify if the package supports direct filtering by number reliably.
-      // Often better to fetch recent logs and filter in memory for partial matches.
-
-      var entries = await CallLog.get();
       return entries.where((entry) {
         if (entry.number == null) return false;
         final entryNumber = entry.number!.replaceAll(RegExp(r'[^0-9+]'), '');
@@ -49,12 +48,12 @@ class CallLogService {
         return entryNumber == cleanNumber;
       });
     } else {
-      return await CallLog.get();
+      return entries;
     }
   }
 
   /// Filters device logs to find ones that haven't been synced yet.
-  /// Matches based on timestamp (within 10 seconds margin) and duration.
+  /// Matches based on approximate timestamp overlapping.
   List<CallLogEntry> getUnsyncedLogs(
     Iterable<CallLogEntry> deviceLogs,
     List<app_model.CallLog> existingLogs,
@@ -64,18 +63,54 @@ class CallLogService {
     for (final deviceLog in deviceLogs) {
       if (deviceLog.timestamp == null) continue;
 
-      final deviceTime = deviceLog.timestamp!;
-      // deviceLog.duration is in seconds
+      final deviceTime = deviceLog.timestamp!; // Call Start Time
+      // deviceLog.duration is in seconds.
       final deviceDuration = deviceLog.duration ?? 0;
+      final deviceEndTime = deviceTime + (deviceDuration * 1000);
 
       // Check if this log matches any existing log
       bool exists = existingLogs.any((existing) {
-        final existingTime = existing.createdAt.millisecondsSinceEpoch;
-        final timeDiff = (existingTime - deviceTime).abs();
+        final existingCreated = existing.createdAt.millisecondsSinceEpoch;
 
-        // Match if time difference is less than 10 seconds AND duration is exact
-        // Note: Sometimes duration might vary slightly? usually not.
-        return timeDiff < 10000 && existing.duration == deviceDuration;
+        // DEDUPLICATION STRATEGY:
+        // Manual logs are created AFTER the call.
+        // So existingCreated (API time) should be > deviceTime (Start time).
+        // It could be closely after (auto-log) or distinct.
+
+        // Case 1: Auto-synced log (same start time).
+        // If we previously synced this exact device log, the backend 'createdAt'
+        // *might* be the device timestamp if we mapped it that way in mapToCallLog.
+        // Let's check mapToCallLog:
+        // It uses: createdAt: DateTime.fromMillisecondsSinceEpoch(entry.timestamp)
+        // So Synced logs have Start Time.
+        final diffRaw = (existingCreated - deviceTime).abs();
+        if (diffRaw < 5000 && existing.duration == deviceDuration) {
+          return true; // Exact match (Synced Log)
+        }
+
+        // Case 2: Manual log (Created after call).
+        // The manual log 'createdAt' should be roughly between Start Time and (End Time + reasonable buffer).
+        // Let's say user logs it within 10 minutes of finishing.
+        // And Duration should match moderately (within 10s?).
+
+        // Wait, if user logs manually, they input duration manually (or 0).
+        // If duration matches, it's strong signal.
+        if (existing.duration > 0 &&
+            (existing.duration - deviceDuration).abs() < 10) {
+          // Duration matches. Check time.
+          // Manual Log must be AFTER start time.
+          if (existingCreated >= deviceTime &&
+              existingCreated < (deviceEndTime + 600000)) {
+            // Within 10 mins of call end
+            return true;
+          }
+        }
+
+        // Simplistic dedupe: If exist log is within [Start, End + 1min] window?
+        // Let's be conservative. If we find *any* log in that window, assume it's this call?
+        // Might skip distinct short calls. But safer than dupe.
+
+        return false;
       });
 
       if (!exists) {

@@ -46,8 +46,11 @@ class RecordingScannerService {
       final dir = Directory(path);
       if (await dir.exists()) {
         try {
-          final List<FileSystemEntity> files = dir.listSync(recursive: true);
-          for (final entity in files) {
+          // Use async listing to avoid blocking UI thread
+          await for (final entity in dir.list(
+            recursive: true,
+            followLinks: false,
+          )) {
             if (entity is File) {
               // Filter by extension
               if (!_isAudioFile(entity.path)) continue;
