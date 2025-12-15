@@ -18,6 +18,7 @@ class _PermissionScreenState extends State<PermissionScreen> {
   final PermissionService _permissionService = PermissionService();
 
   bool _phoneGranted = false;
+  bool _callLogGranted = false;
   bool _storageGranted = false;
   String? _recordingPath;
   bool _isLoading = true;
@@ -91,20 +92,9 @@ class _PermissionScreenState extends State<PermissionScreen> {
   }
 
   Future<void> _refreshState() async {
-    final phone = await Permission.phone.isGranted;
-    bool storage = false;
-
-    // Simple logic: Try request from service to know? No avoiding visual request.
-    // Use service to check
-    // Logic from PermissionService:
-    // return phoneGranted && storageGranted;
-
-    // I'll just check if *any* storage is granted for UI feedback
-    if (await Permission.audio.isGranted ||
-        await Permission.storage.isGranted ||
-        await Permission.manageExternalStorage.isGranted) {
-      storage = true;
-    }
+    final phone = await _permissionService.checkPhone();
+    final callLog = await _permissionService.checkCallLog();
+    final storage = await _permissionService.checkStorage();
 
     final prefs = await SharedPreferences.getInstance();
     final path = prefs.getString('recording_path');
@@ -112,6 +102,7 @@ class _PermissionScreenState extends State<PermissionScreen> {
     if (mounted) {
       setState(() {
         _phoneGranted = phone;
+        _callLogGranted = callLog;
         _storageGranted = storage;
         _recordingPath = path;
         _isLoading = false;
@@ -121,6 +112,11 @@ class _PermissionScreenState extends State<PermissionScreen> {
 
   Future<void> _requestPhone() async {
     await _permissionService.requestPhone();
+    _refreshState();
+  }
+
+  Future<void> _requestCallLog() async {
+    await _permissionService.requestCallLog();
     _refreshState();
   }
 
@@ -171,7 +167,7 @@ class _PermissionScreenState extends State<PermissionScreen> {
   }
 
   bool get _allGood =>
-      _phoneGranted && _storageGranted; // Path can be null (default)
+      _phoneGranted && _callLogGranted && _storageGranted; // Path can be null (default)
 
   @override
   Widget build(BuildContext context) {
@@ -212,6 +208,18 @@ class _PermissionScreenState extends State<PermissionScreen> {
                     icon: Icons.phone,
                     isGranted: _phoneGranted,
                     onAction: _requestPhone,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Call Log Permission
+                  _buildPermissionCard(
+                    title: 'Call Log Access',
+                    description:
+                        'Required to read call history and track calls.',
+                    icon: Icons.history,
+                    isGranted: _callLogGranted,
+                    onAction: _requestCallLog,
                   ),
 
                   const SizedBox(height: 16),

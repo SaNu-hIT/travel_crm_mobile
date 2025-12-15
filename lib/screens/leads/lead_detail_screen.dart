@@ -131,50 +131,11 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
 
     File? file = await _recordingScanner.scanForRecentRecording();
 
-    // If no recent file found, ask if they want to pick manually
-    if (file == null) {
-      // Optional: We can skip this manual pick prompt if we assume "No File = Just Log"
-      // But user might want to pick.
-      // Let's go straight to Dialog, and offer "Attach Recording" button?
-      // Or keep simple flow:
-      // 1. Auto-scan.
-      // 2. If nothing, ask "Attach manual recording?".
-      // 3. If no, proceed to Log Dialog (without file).
-
-      // Let's implement robust flow:
-      // Attempt scan.
-      // If fail, show dialog "No automatic recording found. Select manually?"
-      // If yes -> Pick file.
-      // Regardless of file or not -> Show Call Details Dialog.
-
-      // Simplified for UX:
-      // Show Log Dialog. If file found, say "Recording Attached".
-      // If not, allow "Attach File" button in dialog?
-      // My CallLogDialog didn't implement "Attach File" button logic inside it.
-      // So I will stick to pre-dialog logic.
-
-      // For now:
-      // If no file found, we just proceed to Log Dialog (no recording).
-      // The user can't "manually pick" in this flow unless I add headers.
-      // Let's keep it simple as per user request "update log after disconnect".
-    }
-
-    if (!mounted) return;
-
-    // Show Call Details Dialog
-    final logData = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (ctx) => CallLogDialog(
-        hasRecording: file != null,
-        initialDuration: file != null
-            ? 0
-            : 0, // Could try to get length if possible
-      ),
-    );
-
-    if (logData != null) {
-      // Save Log
-      _saveCallLog(logData, file);
+    if (file != null) {
+      // Automatically upload recording without showing dialog
+      await _autoUploadRecording(file);
+    } else {
+      print('No recent recording found in configured folders');
     }
   }
 
@@ -197,6 +158,66 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } else {
       _showSnackBar(false, 'Could not play recording');
+    }
+  }
+
+  Future<void> _autoUploadRecording(File file) async {
+    final leadProvider = Provider.of<LeadProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    if (!mounted) return;
+
+    print('Auto-uploading recording: ${file.path}');
+
+    // Get file metadata
+    final stats = await file.stat();
+    final timestamp = stats.modified.millisecondsSinceEpoch;
+
+    // Get the most recent call log to extract duration
+    final currentLead = leadProvider.currentLead;
+    int duration = 0;
+
+    if (currentLead != null && currentLead.callLogs.isNotEmpty) {
+      // Find the most recent call log (should be the one we just synced)
+      final recentLog = currentLead.callLogs.first;
+      duration = recentLog.duration;
+    }
+
+    // Automatically determine outcome based on duration
+    final outcome = duration > 0 ? 'ANSWERED' : 'NO_ANSWER';
+
+    final success = await leadProvider.uploadRecording(
+      widget.leadId,
+      file,
+      metadata: {
+        'outcome': outcome,
+        'duration': duration,
+        'notes': 'Auto-uploaded recording',
+        'callType': 'OUTGOING',
+        'createdAt': timestamp,
+      },
+    );
+
+    if (!mounted) return;
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Recording uploaded successfully'),
+          backgroundColor: AppColors.success,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      // Refresh lead to show the updated recording
+      await leadProvider.fetchLeadById(widget.leadId);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(leadProvider.error ?? 'Failed to upload recording'),
+          backgroundColor: AppColors.error,
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 
