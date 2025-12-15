@@ -253,6 +253,44 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
     }
   }
 
+  Future<void> _deleteCallLog(String callLogId, app_call_log.CallLog log) async {
+    // Show confirmation dialog
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Call Log'),
+        content: Text(
+          'Are you sure you want to delete this ${log.callType == app_call_log.CallType.missed ? 'missed' : log.callType == app_call_log.CallType.incoming ? 'incoming' : 'outgoing'} call log?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final leadProvider = Provider.of<LeadProvider>(context, listen: false);
+    final success = await leadProvider.deleteCallLog(widget.leadId, callLogId);
+
+    if (!mounted) return;
+
+    _showSnackBar(
+      success,
+      success
+          ? 'Call log deleted successfully'
+          : leadProvider.error ?? 'Failed to delete call log',
+    );
+  }
+
   Future<void> _showAddCommentDialog() async {
     final comment = await showDialog<String>(
       context: context,
@@ -590,7 +628,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
           if (lead.callLogs.isEmpty)
             _buildEmptyState('No calls logged yet', Icons.phone_missed)
           else
-            ...lead.callLogs.map(
+            ...lead.callLogs.reversed.map(
               (log) => Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
@@ -650,6 +688,15 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
                           fontSize: 12,
                         ),
                       ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.red,
+                          size: 20,
+                        ),
+                        onPressed: () => _deleteCallLog(log.id!, log),
+                        tooltip: 'Delete',
+                      ),
                     ],
                   ),
                 ),
@@ -667,10 +714,10 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
           if (lead.comments.isEmpty)
             _buildEmptyState('No notes yet', Icons.note)
           else
-            ...lead.comments.asMap().entries.map((entry) {
+            ...lead.comments.reversed.toList().asMap().entries.map((entry) {
               return CommentItem(
                 comment: entry.value,
-                isLast: entry.key == lead.comments.length - 1,
+                isLast: entry.key == lead.comments.reversed.length - 1,
               );
             }),
         ],

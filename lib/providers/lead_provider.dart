@@ -377,4 +377,32 @@ class LeadProvider with ChangeNotifier {
       return false;
     }
   }
+
+  // Delete Call Log
+  Future<bool> deleteCallLog(String leadId, String callLogId) async {
+    _error = null;
+    notifyListeners();
+
+    final response = await _apiService.delete<Lead>(
+      '${AppConfig.leadsEndpoint}/$leadId/call-logs?callLogId=$callLogId',
+      fromJson: (data) => Lead.fromJson(data as Map<String, dynamic>),
+    );
+
+    if (response.success && response.data != null) {
+      _currentLead = response.data;
+
+      // Update the lead in the list
+      final index = _leads.indexWhere((l) => l.id == leadId);
+      if (index != -1) {
+        _leads[index] = response.data!;
+      }
+
+      notifyListeners();
+      return true;
+    } else {
+      _error = response.error ?? 'Failed to delete call log';
+      notifyListeners();
+      return false;
+    }
+  }
 }
