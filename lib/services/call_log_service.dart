@@ -188,9 +188,11 @@ class CallLogService {
     app_model.CallType type;
     switch (entry.callType) {
       case CallType.incoming:
+      case CallType.wifiIncoming:
         type = app_model.CallType.incoming;
         break;
       case CallType.outgoing:
+      case CallType.wifiOutgoing:
         type = app_model.CallType.outgoing;
         break;
       case CallType.missed:
@@ -198,11 +200,14 @@ class CallLogService {
         break;
       case CallType.rejected:
       case CallType.blocked:
-        type =
-            app_model.CallType.missed; // Map rejected/blocked to missed for now
+        type = app_model.CallType.missed; // Map rejected/blocked to missed
         break;
+      case CallType.unknown:
       default:
-        type = app_model.CallType.incoming; // Default to incoming
+        // For unknown types, try to infer from duration
+        type = (entry.duration ?? 0) > 0
+            ? app_model.CallType.incoming
+            : app_model.CallType.missed;
     }
 
     return app_model.CallLog(

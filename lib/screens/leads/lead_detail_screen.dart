@@ -628,7 +628,8 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
           if (lead.callLogs.isEmpty)
             _buildEmptyState('No calls logged yet', Icons.phone_missed)
           else
-            ...lead.callLogs.reversed.map(
+            ...(lead.callLogs.toList()
+              ..sort((a, b) => b.createdAt.compareTo(a.createdAt))).map(
               (log) => Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(
@@ -688,15 +689,6 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
                           fontSize: 12,
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.delete_outline,
-                          color: Colors.red,
-                          size: 20,
-                        ),
-                        onPressed: () => _deleteCallLog(log.id!, log),
-                        tooltip: 'Delete',
-                      ),
                     ],
                   ),
                 ),
@@ -714,10 +706,13 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
           if (lead.comments.isEmpty)
             _buildEmptyState('No notes yet', Icons.note)
           else
-            ...lead.comments.reversed.toList().asMap().entries.map((entry) {
+            ...(lead.comments.toList()
+              ..sort((a, b) => b.createdAt.compareTo(a.createdAt)))
+                .asMap().entries.map((entry) {
+              final sortedLength = lead.comments.length;
               return CommentItem(
                 comment: entry.value,
-                isLast: entry.key == lead.comments.reversed.length - 1,
+                isLast: entry.key == sortedLength - 1,
               );
             }),
         ],
