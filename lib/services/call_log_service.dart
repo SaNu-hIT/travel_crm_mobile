@@ -4,15 +4,28 @@ import '../models/call_log.dart' as app_model;
 
 class CallLogService {
   /// Checks and requests the required permissions for accessing call logs.
+  /// Returns true if permission is granted, false otherwise.
   Future<bool> checkPermission() async {
     final status = await Permission.phone.status;
     if (status.isGranted) {
       return true;
     }
 
-    // Request permission
+    // Permission not granted, try to request it
     final result = await Permission.phone.request();
-    return result.isGranted;
+
+    if (result.isGranted) {
+      print('CallLogService: Permission granted');
+      return true;
+    } else if (result.isDenied) {
+      print('CallLogService: Permission denied by user');
+      return false;
+    } else if (result.isPermanentlyDenied) {
+      print('CallLogService: Permission permanently denied - user must enable in settings');
+      return false;
+    }
+
+    return false;
   }
 
   /// Fetches call logs from the device (last 60 days).
@@ -20,35 +33,69 @@ class CallLogService {
   Future<Iterable<CallLogEntry>> fetchCallLogs({String? phoneNumber}) async {
     final hasPermission = await checkPermission();
     if (!hasPermission) {
-      print('CallLogService: Permission denied');
+      print('CallLogService: Cannot fetch call logs - permission denied');
       return [];
     }
 
-    // Optimization: Fetch only logs from the last 60 days
-    final now = DateTime.now();
-    final fromDate = now.subtract(const Duration(days: 60));
-    final fromTimestamp = fromDate.millisecondsSinceEpoch;
+    try {
+      // Optimization: Fetch only logs from the last 60 days
+      final now = DateTime.now();
+      final fromDate = now.subtract(const Duration(days: 60));
+      final fromTimestamp = fromDate.millisecondsSinceEpoch;
 
-    // Use query to filter by date at native level
-    // This helps avoid Parcel errors on very old/corrupt logs
-    var entries = await CallLog.query(dateFrom: fromTimestamp);
+      print('CallLogService: Fetching call logs from ${fromDate.toString()}');
+      print('CallLogService: From timestamp: $fromTimestamp');
 
-    if (phoneNumber != null) {
-      final cleanNumber = phoneNumber.replaceAll(RegExp(r'[^0-9+]'), '');
+      // Use query to filter by date at native level
+      // This helps avoid Parcel errors on very old/corrupt logs
+      var entries = await CallLog.query(dateFrom: fromTimestamp);
+      print('CallLogService: Fetched ${entries.length} call logs from device');
 
-      return entries.where((entry) {
-        if (entry.number == null) return false;
-        final entryNumber = entry.number!.replaceAll(RegExp(r'[^0-9+]'), '');
-        // Check if numbers end with the same sequence (last 10 digits) to handle country codes
-        if (entryNumber.length >= 10 && cleanNumber.length >= 10) {
-          return entryNumber.endsWith(
-            cleanNumber.substring(cleanNumber.length - 10),
-          );
+      // Log details of the most recent call logs for debugging
+      if (entries.isNotEmpty) {
+        print('=== RECENT DEVICE CALL LOGS (Last 10) ===');
+        var count = 0;
+        for (final entry in entries.take(10)) {
+          count++;
+          final timestamp = entry.timestamp != null
+              ? DateTime.fromMillisecondsSinceEpoch(entry.timestamp!)
+              : null;
+          print('$count. Number: ${entry.number ?? "Unknown"}');
+          print('   Type: ${entry.callType}');
+          print('   Duration: ${entry.duration ?? 0}s');
+          print('   Timestamp: ${timestamp?.toString() ?? "Unknown"}');
+          if (timestamp != null) {
+            print('   Date: ${timestamp.year}-${timestamp.month.toString().padLeft(2, '0')}-${timestamp.day.toString().padLeft(2, '0')} ${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}');
+          }
         }
-        return entryNumber == cleanNumber;
-      });
-    } else {
-      return entries;
+        print('=== END RECENT CALL LOGS ===');
+      }
+
+      if (phoneNumber != null) {
+        final cleanNumber = phoneNumber.replaceAll(RegExp(r'[^0-9]'), ''); // Remove ALL non-digits including +
+        print('CallLogService: Filtering for phone number: $phoneNumber (cleaned: $cleanNumber)');
+
+        final filtered = entries.where((entry) {
+          if (entry.number == null) return false;
+          final entryNumber = entry.number!.replaceAll(RegExp(r'[^0-9]'), ''); // Remove ALL non-digits including +
+
+          // Check if numbers end with the same sequence (last 10 digits) to handle country codes
+          if (entryNumber.length >= 10 && cleanNumber.length >= 10) {
+            final entryLast10 = entryNumber.substring(entryNumber.length - 10);
+            final cleanLast10 = cleanNumber.substring(cleanNumber.length - 10);
+            return entryLast10 == cleanLast10;
+          }
+          return entryNumber == cleanNumber;
+        }).toList();
+
+        print('CallLogService: Filtered to ${filtered.length} logs for number: $phoneNumber');
+        return filtered;
+      } else {
+        return entries;
+      }
+    } catch (e) {
+      print('CallLogService: Error fetching call logs - $e');
+      return [];
     }
   }
 
@@ -60,6 +107,15 @@ class CallLogService {
   ) {
     final unsynced = <CallLogEntry>[];
 
+    print('  === DEDUPLICATION DEBUG ===');
+    print('  Device logs to check: ${deviceLogs.length}');
+    print('  Existing logs in database: ${existingLogs.length}');
+    print('  Existing log timestamps:');
+    for (var log in existingLogs) {
+      print('    - ${log.createdAt.toLocal()}, duration: ${log.duration}s, type: ${log.callType}');
+    }
+    print('  === CHECKING EACH DEVICE LOG ===');
+
     for (final deviceLog in deviceLogs) {
       if (deviceLog.timestamp == null) continue;
 
@@ -68,55 +124,57 @@ class CallLogService {
       final deviceDuration = deviceLog.duration ?? 0;
       final deviceEndTime = deviceTime + (deviceDuration * 1000);
 
+      print('  → Checking device log: ${deviceLog.number}, time: ${DateTime.fromMillisecondsSinceEpoch(deviceTime)}, duration: ${deviceDuration}s');
+
       // Check if this log matches any existing log
-      bool exists = existingLogs.any((existing) {
+      bool exists = false;
+      for (var existing in existingLogs) {
         final existingCreated = existing.createdAt.millisecondsSinceEpoch;
 
-        // DEDUPLICATION STRATEGY:
-        // Manual logs are created AFTER the call.
-        // So existingCreated (API time) should be > deviceTime (Start time).
-        // It could be closely after (auto-log) or distinct.
+        // IMPROVED DEDUPLICATION STRATEGY:
+        // Compare timestamps with more tolerance for timezone/server delays
 
-        // Case 1: Auto-synced log (same start time).
-        // If we previously synced this exact device log, the backend 'createdAt'
-        // *might* be the device timestamp if we mapped it that way in mapToCallLog.
-        // Let's check mapToCallLog:
-        // It uses: createdAt: DateTime.fromMillisecondsSinceEpoch(entry.timestamp)
-        // So Synced logs have Start Time.
+        // Case 1: Auto-synced log - timestamps should be very close
+        // Allow up to 60 seconds difference to account for server processing time
         final diffRaw = (existingCreated - deviceTime).abs();
-        if (diffRaw < 5000 && existing.duration == deviceDuration) {
-          return true; // Exact match (Synced Log)
-        }
-
-        // Case 2: Manual log (Created after call).
-        // The manual log 'createdAt' should be roughly between Start Time and (End Time + reasonable buffer).
-        // Let's say user logs it within 10 minutes of finishing.
-        // And Duration should match moderately (within 10s?).
-
-        // Wait, if user logs manually, they input duration manually (or 0).
-        // If duration matches, it's strong signal.
-        if (existing.duration > 0 &&
-            (existing.duration - deviceDuration).abs() < 10) {
-          // Duration matches. Check time.
-          // Manual Log must be AFTER start time.
-          if (existingCreated >= deviceTime &&
-              existingCreated < (deviceEndTime + 600000)) {
-            // Within 10 mins of call end
-            return true;
+        if (diffRaw < 60000) { // Within 60 seconds
+          // If timestamps are close, check duration too
+          final durationDiff = (existing.duration - deviceDuration).abs();
+          if (durationDiff < 5) {
+            print('    → Found matching log (timestamp diff: ${diffRaw}ms, duration diff: ${durationDiff}s)');
+            print('       Device: ${DateTime.fromMillisecondsSinceEpoch(deviceTime)}');
+            print('       Existing: ${existing.createdAt.toLocal()}');
+            exists = true;
+            break;
           }
         }
 
-        // Simplistic dedupe: If exist log is within [Start, End + 1min] window?
-        // Let's be conservative. If we find *any* log in that window, assume it's this call?
-        // Might skip distinct short calls. But safer than dupe.
-
-        return false;
-      });
+        // Case 2: Check if existing log falls within the call time window
+        // Server might have adjusted the timestamp, so check if it's within reasonable range
+        if (existingCreated >= deviceTime - 300000 && // 5 min before call start
+            existingCreated <= deviceEndTime + 300000) { // 5 min after call end
+          // Within time window, check duration similarity
+          final durationDiff = (existing.duration - deviceDuration).abs();
+          if (durationDiff < 10) {
+            print('    → Found matching log in time window (duration diff: ${durationDiff}s)');
+            print('       Device: ${DateTime.fromMillisecondsSinceEpoch(deviceTime)}');
+            print('       Existing: ${existing.createdAt.toLocal()}');
+            exists = true;
+            break;
+          }
+        }
+      }
 
       if (!exists) {
+        print('    ✓ UNSYNCED - Will be added to database');
         unsynced.add(deviceLog);
       }
     }
+
+    print('  === DEDUPLICATION SUMMARY ===');
+    print('  Total device logs checked: ${deviceLogs.length}');
+    print('  Already synced: ${deviceLogs.length - unsynced.length}');
+    print('  New logs to sync: ${unsynced.length}');
 
     return unsynced;
   }

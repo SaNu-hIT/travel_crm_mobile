@@ -72,6 +72,7 @@ class CallLog {
   final String? notes;
   final CallOutcome? outcome;
   final DateTime createdAt;
+  final String? recordingUrl;
 
   CallLog({
     this.id,
@@ -82,6 +83,7 @@ class CallLog {
     this.notes,
     this.outcome,
     required this.createdAt,
+    this.recordingUrl,
   });
 
   factory CallLog.fromJson(Map<String, dynamic> json) {
@@ -96,6 +98,7 @@ class CallLog {
           ? CallOutcome.fromString(json['outcome'] as String)
           : null,
       createdAt: DateTime.parse(json['createdAt'] as String),
+      recordingUrl: json['recordingUrl'] as String?,
     );
   }
 
@@ -108,7 +111,8 @@ class CallLog {
       'duration': duration,
       if (notes != null) 'notes': notes,
       if (outcome != null) 'outcome': outcome!.value,
-      'createdAt': createdAt.toIso8601String(),
+      'createdAt': createdAt.toUtc().toIso8601String(),
+      if (recordingUrl != null) 'recordingUrl': recordingUrl,
     };
   }
 

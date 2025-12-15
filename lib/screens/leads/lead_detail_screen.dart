@@ -17,6 +17,9 @@ import '../../models/call_log.dart' as app_call_log;
 import 'dart:io';
 
 import '../../services/recording_scanner_service.dart';
+import '../../services/sync_service.dart';
+import '../../config/app_config.dart';
+import '../../providers/auth_provider.dart';
 
 class LeadDetailScreen extends StatefulWidget {
   final String leadId;
@@ -86,10 +89,32 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _isCalling) {
       _isCalling = false;
-      // Give a small delay for file system to update
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) _scanForRecording();
+      // First, sync call logs from device to catch the new call
+      Future.delayed(const Duration(seconds: 2), () async {
+        if (mounted) {
+          await _syncCallLogsAfterCall();
+          // Then scan for recording
+          _scanForRecording();
+        }
       });
+    }
+  }
+
+  Future<void> _syncCallLogsAfterCall() async {
+    final leadProvider = Provider.of<LeadProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    if (authProvider.user != null) {
+      print('Auto-syncing call logs after call...');
+      final syncResult = await SyncService().syncSingleLeadCallLogs(
+        leadProvider,
+        widget.leadId,
+        authProvider.user,
+      );
+
+      if (syncResult.callLogsAdded > 0) {
+        print('Synced ${syncResult.callLogsAdded} new call log(s)');
+      }
     }
   }
 
@@ -153,6 +178,28 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
     }
   }
 
+  Future<void> _playRecording(String relativeUrl) async {
+    // Construct full URL
+    // Ensure relativeUrl starts with / if not present (though usually it does)
+    final path = relativeUrl.startsWith('/') ? relativeUrl : '/$relativeUrl';
+    // Remove /api from base URL if it exists, or just append distinct path?
+    // AppConfig.apiBaseUrl usually ends with /api (e.g. http://host:3000/api)
+    // But recordings are in public folder http://host:3000/uploads/...
+    // So we need the ROOT url, not API url.
+    // Let's assume user configured something or we parse it.
+
+    final apiUri = Uri.parse(AppConfig.apiBaseUrl);
+    final rootUrl = '${apiUri.scheme}://${apiUri.host}:${apiUri.port}';
+    final fullUrl = '$rootUrl$path';
+
+    final uri = Uri.parse(fullUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      _showSnackBar(false, 'Could not play recording');
+    }
+  }
+
   Future<void> _saveCallLog(Map<String, dynamic> data, File? file) async {
     final leadProvider = Provider.of<LeadProvider>(context, listen: false);
     bool success;
@@ -163,6 +210,9 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
 
     if (file != null) {
       // Upload with metadata
+      final stats = await file.stat();
+      final timestamp = stats.modified.millisecondsSinceEpoch;
+
       success = await leadProvider.uploadRecording(
         widget.leadId,
         file,
@@ -171,6 +221,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
           'duration': data['duration'],
           'notes': data['notes'],
           'callType': 'OUTGOING',
+          'createdAt': timestamp,
         },
       );
     } else {
@@ -580,12 +631,26 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
                     DateFormat('MMM d, h:mm a').format(log.createdAt.toLocal()),
                     style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
-                  trailing: Text(
-                    '${log.duration ~/ 60}m ${log.duration % 60}s',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (log.recordingUrl != null)
+                        IconButton(
+                          icon: const Icon(
+                            Icons.play_circle_fill,
+                            color: AppColors.primary,
+                          ),
+                          onPressed: () => _playRecording(log.recordingUrl!),
+                          tooltip: 'Play Recording',
+                        ),
+                      Text(
+                        '${log.duration ~/ 60}m ${log.duration % 60}s',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

@@ -16,22 +16,47 @@ class LeadsListScreen extends StatefulWidget {
   State<LeadsListScreen> createState() => _LeadsListScreenState();
 }
 
-class _LeadsListScreenState extends State<LeadsListScreen> {
+class _LeadsListScreenState extends State<LeadsListScreen> with WidgetsBindingObserver {
   final RefreshController _refreshController = RefreshController();
   bool _showingGrid = true;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final leadProvider = Provider.of<LeadProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      leadProvider.fetchLeads().then((_) {
+      leadProvider.fetchLeads().then((_) async {
         // Trigger global sync after leads are fetched
         if (authProvider.user != null) {
-          SyncService().syncGlobalCallLogs(leadProvider, authProvider.user);
+          final syncResult = await SyncService()
+              .syncGlobalCallLogs(leadProvider, authProvider.user);
+
+          // Show sync result if there were updates or errors
+          if (mounted && syncResult.leadsUpdated > 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(syncResult.message),
+                backgroundColor: AppColors.success,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          } else if (mounted && !syncResult.success) {
+            // Only show error if it's a permission issue
+            if (syncResult.message.contains('permission')) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(syncResult.message),
+                  backgroundColor: AppColors.warning,
+                  duration: const Duration(seconds: 3),
+                ),
+              );
+            }
+          }
         }
       });
     });
@@ -46,14 +71,78 @@ class _LeadsListScreenState extends State<LeadsListScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _refreshController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // App came to foreground - sync call logs in case user made calls from outside the app
+      print('App resumed - auto-syncing call logs...');
+      _syncCallLogsOnResume();
+    }
+  }
+
+  Future<void> _syncCallLogsOnResume() async {
+    final leadProvider = Provider.of<LeadProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    if (authProvider.user != null) {
+      final syncResult = await SyncService()
+          .syncGlobalCallLogs(leadProvider, authProvider.user);
+
+      // Optionally show notification if new logs were synced
+      if (mounted && syncResult.callLogsAdded > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Synced ${syncResult.callLogsAdded} new call log(s)'),
+            backgroundColor: AppColors.success,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _onRefresh() async {
     final leadProvider = Provider.of<LeadProvider>(context, listen: false);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    // Refresh leads first
     await leadProvider.refreshLeads();
+
+    // Then sync call logs after leads are refreshed
+    if (authProvider.user != null) {
+      final syncResult =
+          await SyncService().syncGlobalCallLogs(leadProvider, authProvider.user);
+
+      // Show sync result feedback to user
+      if (mounted) {
+        if (syncResult.leadsUpdated > 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(syncResult.message),
+              backgroundColor: AppColors.success,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        } else if (!syncResult.success && syncResult.message.contains('permission')) {
+          // Show warning for permission issues
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(syncResult.message),
+              backgroundColor: AppColors.warning,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    }
+
     _refreshController.refreshCompleted();
   }
 
