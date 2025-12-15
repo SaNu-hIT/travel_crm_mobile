@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/lead_provider.dart';
 import '../../utils/constants.dart';
 import '../../widgets/lead_card.dart';
+import '../../widgets/shimmer_widgets.dart';
 import '../../services/sync_service.dart';
 
 class LeadsListScreen extends StatefulWidget {
@@ -257,7 +258,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> with WidgetsBindingOb
   Widget _buildDashboard(AuthProvider authProvider, LeadProvider leadProvider) {
     if (leadProvider.loadingState == LeadLoadingState.loading &&
         leadProvider.leads.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const ShimmerDashboardLoading();
     }
 
     final statusCounts = _getStatusCounts(leadProvider);
@@ -517,11 +518,9 @@ class _LeadsListScreenState extends State<LeadsListScreen> with WidgetsBindingOb
                 // Recent Leads List
                 if (leadProvider.leads.isEmpty)
                   if (leadProvider.loadingState == LeadLoadingState.loading)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(20.0),
-                        child: CircularProgressIndicator(),
-                      ),
+                    ...List.generate(
+                      5,
+                      (index) => const ShimmerLeadCard(),
                     )
                   else
                     Container(
@@ -854,7 +853,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> with WidgetsBindingOb
             child:
                 leadProvider.loadingState == LeadLoadingState.loading &&
                     leadProvider.leads.isEmpty
-                ? const Center(child: CircularProgressIndicator())
+                ? const ShimmerLeadsList()
                 : leadProvider.loadingState == LeadLoadingState.error
                 ? Center(
                     child: Column(

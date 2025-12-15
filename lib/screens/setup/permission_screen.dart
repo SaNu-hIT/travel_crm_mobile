@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/permission_service.dart';
 import '../../utils/theme.dart';
 import '../../utils/constants.dart';
+import '../../widgets/shimmer_widgets.dart';
 
 class PermissionScreen extends StatefulWidget {
   const PermissionScreen({super.key});
@@ -179,7 +180,7 @@ class _PermissionScreenState extends State<PermissionScreen> {
         elevation: 0,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const ShimmerPermissionScreen()
           : SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
               child: Column(

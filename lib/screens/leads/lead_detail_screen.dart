@@ -12,6 +12,7 @@ import '../../widgets/comment_item.dart';
 import '../../widgets/add_comment_dialog.dart';
 import '../../widgets/lead_conversion_dialog.dart';
 import '../../widgets/call_log_dialog.dart';
+import '../../widgets/shimmer_widgets.dart';
 import 'quote_editor_screen.dart';
 import '../../models/call_log.dart' as app_call_log;
 import 'dart:io';
@@ -274,14 +275,21 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
     }
   }
 
-  Future<void> _deleteCallLog(String callLogId, app_call_log.CallLog log) async {
+  Future<void> _deleteCallLog(
+    String callLogId,
+    app_call_log.CallLog log,
+  ) async {
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Call Log'),
         content: Text(
-          'Are you sure you want to delete this ${log.callType == app_call_log.CallType.missed ? 'missed' : log.callType == app_call_log.CallType.incoming ? 'incoming' : 'outgoing'} call log?',
+          'Are you sure you want to delete this ${log.callType == app_call_log.CallType.missed
+              ? 'missed'
+              : log.callType == app_call_log.CallType.incoming
+              ? 'incoming'
+              : 'outgoing'} call log?',
         ),
         actions: [
           TextButton(
@@ -410,7 +418,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
       body: Consumer<LeadProvider>(
         builder: (context, leadProvider, child) {
           if (leadProvider.loadingState == LeadLoadingState.loading) {
-            return const Center(child: CircularProgressIndicator());
+            return const ShimmerLeadDetail();
           }
 
           if (leadProvider.currentLead == null) {
@@ -638,7 +646,7 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Call Logs
           const Text(
@@ -650,71 +658,75 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
             _buildEmptyState('No calls logged yet', Icons.phone_missed)
           else
             ...(lead.callLogs.toList()
-              ..sort((a, b) => b.createdAt.compareTo(a.createdAt))).map(
-              (log) => Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  minVerticalPadding: 16,
-                  leading: CircleAvatar(
-                    backgroundColor:
-                        log.callType == app_call_log.CallType.missed
-                        ? Colors.red.withOpacity(0.1)
-                        : log.callType == app_call_log.CallType.incoming
-                        ? Colors.green.withOpacity(0.1)
-                        : Colors.blue.withOpacity(0.1),
-                    child: Icon(
-                      log.callType == app_call_log.CallType.missed
-                          ? Icons.call_missed
-                          : log.callType == app_call_log.CallType.incoming
-                          ? Icons.call_received
-                          : Icons.call_made,
-                      color: log.callType == app_call_log.CallType.missed
-                          ? Colors.red
-                          : log.callType == app_call_log.CallType.incoming
-                          ? Colors.green
-                          : Colors.blue,
-                      size: 16,
-                    ),
-                  ),
-                  title: Text(
-                    log.callType == app_call_log.CallType.missed
-                        ? 'Missed Call'
-                        : log.callType == app_call_log.CallType.incoming
-                        ? 'Incoming Call'
-                        : 'Outgoing Call',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                  subtitle: Text(
-                    DateFormat('MMM d, h:mm a').format(log.createdAt.toLocal()),
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (log.recordingUrl != null)
-                        IconButton(
-                          icon: const Icon(
-                            Icons.play_circle_fill,
-                            color: AppColors.primary,
-                          ),
-                          onPressed: () => _playRecording(log.recordingUrl!),
-                          tooltip: 'Play Recording',
-                        ),
-                      Text(
-                        '${log.duration ~/ 60}m ${log.duration % 60}s',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                  ..sort((a, b) => b.createdAt.compareTo(a.createdAt)))
+                .map(
+                  (log) => Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      minVerticalPadding: 16,
+                      leading: CircleAvatar(
+                        backgroundColor:
+                            log.callType == app_call_log.CallType.missed
+                            ? Colors.red.withOpacity(0.1)
+                            : log.callType == app_call_log.CallType.incoming
+                            ? Colors.green.withOpacity(0.1)
+                            : Colors.blue.withOpacity(0.1),
+                        child: Icon(
+                          log.callType == app_call_log.CallType.missed
+                              ? Icons.call_missed
+                              : log.callType == app_call_log.CallType.incoming
+                              ? Icons.call_received
+                              : Icons.call_made,
+                          color: log.callType == app_call_log.CallType.missed
+                              ? Colors.red
+                              : log.callType == app_call_log.CallType.incoming
+                              ? Colors.green
+                              : Colors.blue,
+                          size: 16,
                         ),
                       ),
-                    ],
+                      title: Text(
+                        log.callType == app_call_log.CallType.missed
+                            ? 'Missed Call'
+                            : log.callType == app_call_log.CallType.incoming
+                            ? 'Incoming Call'
+                            : 'Outgoing Call',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                      subtitle: Text(
+                        DateFormat(
+                          'MMM d, h:mm a',
+                        ).format(log.createdAt.toLocal()),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      ),
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (log.recordingUrl != null)
+                            IconButton(
+                              icon: const Icon(
+                                Icons.play_circle_fill,
+                                color: AppColors.primary,
+                              ),
+                              onPressed: () =>
+                                  _playRecording(log.recordingUrl!),
+                              tooltip: 'Play Recording',
+                            ),
+                          Text(
+                            '${log.duration ~/ 60}m ${log.duration % 60}s',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
 
           const SizedBox(height: 24),
 
@@ -728,14 +740,16 @@ class _LeadDetailScreenState extends State<LeadDetailScreen>
             _buildEmptyState('No notes yet', Icons.note)
           else
             ...(lead.comments.toList()
-              ..sort((a, b) => b.createdAt.compareTo(a.createdAt)))
-                .asMap().entries.map((entry) {
-              final sortedLength = lead.comments.length;
-              return CommentItem(
-                comment: entry.value,
-                isLast: entry.key == sortedLength - 1,
-              );
-            }),
+                  ..sort((a, b) => b.createdAt.compareTo(a.createdAt)))
+                .asMap()
+                .entries
+                .map((entry) {
+                  final sortedLength = lead.comments.length;
+                  return CommentItem(
+                    comment: entry.value,
+                    isLast: entry.key == sortedLength - 1,
+                  );
+                }),
         ],
       ),
     );
