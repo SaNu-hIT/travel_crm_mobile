@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:call_log/call_log.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../models/call_log.dart' as app_model;
+import 'recording_scanner_service.dart';
 
 class CallLogService {
+  final RecordingScannerService _recordingScanner = RecordingScannerService();
   /// Checks and requests the required permissions for accessing call logs.
   /// Returns true if permission is granted, false otherwise.
   Future<bool> checkPermission() async {
@@ -177,6 +180,30 @@ class CallLogService {
     print('  New logs to sync: ${unsynced.length}');
 
     return unsynced;
+  }
+
+  /// Finds a recording file for a specific call log entry.
+  /// Returns the File if found, null otherwise.
+  Future<File?> findRecordingForCallLog(
+    CallLogEntry entry, {
+    Duration lookBack = const Duration(minutes: 5),
+  }) async {
+    if (entry.timestamp == null || entry.number == null) {
+      return null;
+    }
+
+    final callTime = DateTime.fromMillisecondsSinceEpoch(entry.timestamp!);
+
+    print('=== FINDING RECORDING FOR CALL LOG ===');
+    print('Phone: ${entry.number}');
+    print('Timestamp: $callTime');
+    print('Duration: ${entry.duration ?? 0}s');
+
+    return await _recordingScanner.scanForRecentRecording(
+      phoneNumber: entry.number,
+      callTimestamp: callTime,
+      lookBack: lookBack,
+    );
   }
 
   /// Maps a device [CallLogEntry] to the app's [app_model.CallLog] model.

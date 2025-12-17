@@ -22,6 +22,7 @@ class _LeadsListScreenState extends State<LeadsListScreen> with WidgetsBindingOb
   bool _showingGrid = true;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  bool _isSyncing = false;
 
   @override
   void initState() {
@@ -31,33 +32,47 @@ class _LeadsListScreenState extends State<LeadsListScreen> with WidgetsBindingOb
       final leadProvider = Provider.of<LeadProvider>(context, listen: false);
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      leadProvider.fetchLeads().then((_) async {
-        // Trigger global sync after leads are fetched
-        if (authProvider.user != null) {
-          final syncResult = await SyncService()
-              .syncGlobalCallLogs(leadProvider, authProvider.user);
+      // Fetch leads first
+      leadProvider.fetchLeads().then((_) {
+        // Run global sync in background after leads are fetched
+        if (authProvider.user != null && mounted) {
+          // Set syncing state
+          setState(() => _isSyncing = true);
 
-          // Show sync result if there were updates or errors
-          if (mounted && syncResult.leadsUpdated > 0) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(syncResult.message),
-                backgroundColor: AppColors.success,
-                duration: const Duration(seconds: 2),
-              ),
-            );
-          } else if (mounted && !syncResult.success) {
-            // Only show error if it's a permission issue
-            if (syncResult.message.contains('permission')) {
+          SyncService()
+              .syncGlobalCallLogs(leadProvider, authProvider.user)
+              .then((syncResult) {
+            if (!mounted) return;
+
+            // Clear syncing state
+            setState(() => _isSyncing = false);
+
+            // Show sync result if there were updates or errors
+            if (syncResult.leadsUpdated > 0) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(syncResult.message),
-                  backgroundColor: AppColors.warning,
-                  duration: const Duration(seconds: 3),
+                  backgroundColor: AppColors.success,
+                  duration: const Duration(seconds: 2),
                 ),
               );
+            } else if (!syncResult.success) {
+              // Only show error if it's a permission issue
+              if (syncResult.message.contains('permission')) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(syncResult.message),
+                    backgroundColor: AppColors.warning,
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              }
             }
-          }
+          }).catchError((error) {
+            if (!mounted) return;
+            setState(() => _isSyncing = false);
+            print('Background sync error on init: $error');
+          });
         }
       });
     });
@@ -89,23 +104,42 @@ class _LeadsListScreenState extends State<LeadsListScreen> with WidgetsBindingOb
   }
 
   Future<void> _syncCallLogsOnResume() async {
+    // Prevent concurrent sync operations
+    if (_isSyncing) return;
+
     final leadProvider = Provider.of<LeadProvider>(context, listen: false);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
     if (authProvider.user != null) {
-      final syncResult = await SyncService()
-          .syncGlobalCallLogs(leadProvider, authProvider.user);
-
-      // Optionally show notification if new logs were synced
-      if (mounted && syncResult.callLogsAdded > 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Synced ${syncResult.callLogsAdded} new call log(s)'),
-            backgroundColor: AppColors.success,
-            duration: const Duration(seconds: 2),
-          ),
-        );
+      // Set syncing state
+      if (mounted) {
+        setState(() => _isSyncing = true);
       }
+
+      // Run sync in background without blocking UI
+      SyncService()
+          .syncGlobalCallLogs(leadProvider, authProvider.user)
+          .then((syncResult) {
+        if (!mounted) return;
+
+        // Clear syncing state
+        setState(() => _isSyncing = false);
+
+        // Show notification if new logs were synced
+        if (syncResult.callLogsAdded > 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Synced ${syncResult.callLogsAdded} new call log(s)'),
+              backgroundColor: AppColors.success,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      }).catchError((error) {
+        if (!mounted) return;
+        setState(() => _isSyncing = false);
+        print('Background sync error: $error');
+      });
     }
   }
 
@@ -116,13 +150,28 @@ class _LeadsListScreenState extends State<LeadsListScreen> with WidgetsBindingOb
     // Refresh leads first
     await leadProvider.refreshLeads();
 
-    // Then sync call logs after leads are refreshed
-    if (authProvider.user != null) {
-      final syncResult =
-          await SyncService().syncGlobalCallLogs(leadProvider, authProvider.user);
+    // Complete refresh immediately to unblock UI
+    _refreshController.refreshCompleted();
 
-      // Show sync result feedback to user
+    // Prevent concurrent sync operations
+    if (_isSyncing) return;
+
+    // Run call log sync in background without blocking refresh
+    if (authProvider.user != null) {
+      // Set syncing state
       if (mounted) {
+        setState(() => _isSyncing = true);
+      }
+
+      SyncService()
+          .syncGlobalCallLogs(leadProvider, authProvider.user)
+          .then((syncResult) {
+        if (!mounted) return;
+
+        // Clear syncing state
+        setState(() => _isSyncing = false);
+
+        // Show sync result feedback to user
         if (syncResult.leadsUpdated > 0) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -141,10 +190,12 @@ class _LeadsListScreenState extends State<LeadsListScreen> with WidgetsBindingOb
             ),
           );
         }
-      }
+      }).catchError((error) {
+        if (!mounted) return;
+        setState(() => _isSyncing = false);
+        print('Background sync error on refresh: $error');
+      });
     }
-
-    _refreshController.refreshCompleted();
   }
 
   void _handleLogout() async {
@@ -322,15 +373,47 @@ class _LeadsListScreenState extends State<LeadsListScreen> with WidgetsBindingOb
                                     color: AppColors.textPrimary,
                                   ),
                                 ),
-                                Text(
-                                  authProvider.user?.email ?? '',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: AppColors.textSecondary,
-                                  ),
+                                Row(
+                                  children: [
+                                    Text(
+                                      authProvider.user?.email ?? '',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                    if (_isSyncing) ...[
+                                      const SizedBox(width: 8),
+                                      const SizedBox(
+                                        width: 10,
+                                        height: 10,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(
+                                            AppColors.primary,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Text(
+                                        'Syncing...',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: AppColors.primary,
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ],
                             ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.settings),
+                            onPressed: () => Navigator.pushNamed(context, '/settings/recording'),
+                            color: AppColors.textSecondary,
+                            tooltip: 'Recording Settings',
                           ),
                           IconButton(
                             icon: const Icon(Icons.logout_rounded),

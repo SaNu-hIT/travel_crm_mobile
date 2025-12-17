@@ -1,5 +1,5 @@
-import 'package:flutter/foundation.dart';
-import 'package:provider/provider.dart';
+import 'dart:io';
+import 'package:call_log/call_log.dart';
 import '../providers/lead_provider.dart';
 import '../services/call_log_service.dart';
 import '../models/lead.dart';
@@ -248,31 +248,110 @@ class SyncService {
           unsyncedByLead[refreshedLead.name] = unsynced.length;
           print('  Syncing ${unsynced.length} new call(s) for lead: ${refreshedLead.name}');
 
-          // Convert and upload
-          final newLogs = unsynced
-              .map(
-                (log) => _callLogService.mapToCallLog(
-                  log,
+          // For each unsynced log, check if there's a recording and upload it
+          for (final unsyncedLog in unsynced) {
+            print('  → Processing call log with timestamp: ${unsyncedLog.timestamp}');
+
+            // Try to find recording for this call
+            final recordingFile = await _callLogService.findRecordingForCallLog(
+              unsyncedLog,
+              lookBack: const Duration(minutes: 5),
+            );
+
+            if (recordingFile != null) {
+              print('    ✓ Found recording: ${recordingFile.path}');
+
+              // Upload recording with call log metadata
+              final stats = await recordingFile.stat();
+              final timestamp = stats.modified.millisecondsSinceEpoch;
+              final duration = unsyncedLog.duration ?? 0;
+              final outcome = duration > 0 ? 'ANSWERED' : 'NO_ANSWER';
+
+              // Determine call type
+              String callType = 'OUTGOING';
+              switch (unsyncedLog.callType) {
+                case CallType.incoming:
+                case CallType.wifiIncoming:
+                  callType = 'INCOMING';
+                  break;
+                case CallType.missed:
+                  callType = 'MISSED';
+                  break;
+                default:
+                  callType = 'OUTGOING';
+              }
+
+              final uploadSuccess = await leadProvider.uploadRecording(
+                refreshedLead.id,
+                recordingFile,
+                metadata: {
+                  'outcome': outcome,
+                  'duration': duration,
+                  'notes': 'Auto-synced with call log',
+                  'callType': callType,
+                  'createdAt': unsyncedLog.timestamp ?? timestamp,
+                },
+              );
+
+              if (uploadSuccess) {
+                print('    ✓ Recording uploaded successfully');
+                totalCallLogsAdded++;
+                updatedCount++;
+              } else {
+                print('    ✗ Failed to upload recording');
+                // Still add the call log without recording
+                final newLog = _callLogService.mapToCallLog(
+                  unsyncedLog,
                   currentUser.id,
                   currentUser.name,
-                ),
-              )
-              .toList();
+                );
 
-          final updatedCallLogs = [
-            ...refreshedLead.callLogs,
-            ...newLogs,
-          ].map((e) => e.toJson()).toList();
+                final updatedCallLogs = [
+                  ...refreshedLead.callLogs,
+                  newLog,
+                ].map((e) => e.toJson()).toList();
 
-          final success =
-              await leadProvider.updateLead(refreshedLead.id, {'callLogs': updatedCallLogs});
+                final success = await leadProvider.updateLead(
+                  refreshedLead.id,
+                  {'callLogs': updatedCallLogs},
+                );
 
-          if (success) {
-            updatedCount++;
-            totalCallLogsAdded += unsynced.length;
-            print('  ✓ Successfully added ${unsynced.length} call log(s). Lead now has ${updatedCallLogs.length} total logs.');
-          } else {
-            print('  ✗ Failed to update lead ${refreshedLead.name}');
+                if (success) {
+                  totalCallLogsAdded++;
+                  updatedCount++;
+                }
+              }
+            } else {
+              print('    ○ No recording found, adding call log only');
+
+              // No recording found, just add the call log
+              final newLog = _callLogService.mapToCallLog(
+                unsyncedLog,
+                currentUser.id,
+                currentUser.name,
+              );
+
+              final updatedCallLogs = [
+                ...refreshedLead.callLogs,
+                newLog,
+              ].map((e) => e.toJson()).toList();
+
+              final success = await leadProvider.updateLead(
+                refreshedLead.id,
+                {'callLogs': updatedCallLogs},
+              );
+
+              if (success) {
+                totalCallLogsAdded++;
+                updatedCount++;
+                print('    ✓ Call log added (no recording)');
+              } else {
+                print('    ✗ Failed to add call log');
+              }
+            }
+
+            // Refresh lead data after each update
+            await leadProvider.fetchLeadById(refreshedLead.id);
           }
         }
       }
